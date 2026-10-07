@@ -174,6 +174,21 @@ def check_contracts():
             warn(f"看板脚本读取 kpi.{field}, 但没有任何 KPI 项提供该字段(该分支不会渲染)")
     ok("dashboard.json 契约完整(含前端反向提取的图表键与 KPI 字段)")
 
+    # 数据窗口必须锚定在 simulator.ANCHOR。页面上的日期与数字是随源码一起提交的:
+    # 产物一旦跟着 runner 的日期/时区走(CI 用 UTC, 比本地少一天), 窗口整体前移,
+    # site/northstar.html 里 "10-07→10-08" 这类日期对在新数据里就不存在 ——
+    # evidence.py 的举证门禁会直接失败(CI 首跑就是这么挂的), 且每日 cron 会永远红。
+    try:
+        sys.path.insert(0, str(ROOT))
+        import simulator as _sim
+        if dash.get("as_of") != _sim.ANCHOR.isoformat():
+            fail(f"dashboard.as_of={dash.get('as_of')!r} 与锚定日期 {_sim.ANCHOR} 不一致 —— "
+                 f"产物正在跟着系统日期漂移, 页面上的日期对与数字会失效")
+        else:
+            ok(f"数据窗口锚定在 {_sim.ANCHOR}(不随 runner 日期/时区漂移)")
+    except Exception as e:                                   # noqa: BLE001
+        warn(f"无法导入 simulator 校验窗口锚定: {e}")
+
     # 2) 前端硬编码的模型成本表 必须覆盖产物里的全部模型(否则表格出现 $0.000)
     block = re.search(r"const COST=\{(.*?)\};", html, re.S)
     if not block:
@@ -337,8 +352,10 @@ def check_data(metrics):
         return
     sys.path.insert(0, str(ROOT))
     from semantic import SemanticLayer
+    import simulator                                    # 窗口锚(见 simulator.ANCHOR)
     con = duckdb.connect(str(db), read_only=True)
-    sl = SemanticLayer(con=con)
+    con.execute("SET threads TO 1")     # 与 build.py 同一口径: 并行浮点求和顺序不定, 会让断言抖
+    sl = SemanticLayer(con=con, anchor=simulator.ANCHOR)
     wmap = (semantic.WINDOWS if semantic else {"1d": 1, "7d": 7, "14d": 14, "30d": 30})
     # 序列末点必须等于同窗口的窗口聚合(±0.5%): 这一条能拦住"比率被逐日求和"这类画法错误
     for m in metrics:

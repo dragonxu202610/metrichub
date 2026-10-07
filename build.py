@@ -101,7 +101,7 @@ def _rolling_distinct(sl, name, m, window="14d"):
     dc = m.get("date_field", "dt")
     col = m["rolling_distinct_on"]
     w = WINDOWS.get(m.get("default_time", "7d"), 7)
-    end = date.today()
+    end = simulator.ANCHOR
     start = end - timedelta(days=WINDOWS.get(window, 14) - 1)
     cond = "WHERE success" if "FILTER (WHERE success)" in m["expr"] else ""
     # ① person_day: (日期, 用户) 去重 —— 同一人一天只算一次;
@@ -284,8 +284,15 @@ def main():
         simulator.main()
 
     con = duckdb.connect(str(ROOT / "data" / "metrichub.duckdb"))
-    con.execute(ELT)
-    sl = SemanticLayer(con=con)
+    # 单线程: DuckDB 默认按 CPU 核数并行做 hash 聚合, 而浮点加法不满足结合律 ——
+    # 同一份数据、同一份 SQL, 求和顺序随线程调度变化, round(...,1) 就会在边界上翻
+    # (实测 model_gross_margin 的日序列在 -8.6 / -8.7 之间跳)。产物必须逐字节可复现:
+    # 页面上的数字是随源码提交的, 产物漂移会让"每个数字可复现"这句话不成立。
+    con.execute("SET threads TO 1")
+    # ELT 里的 current_date 一律换成锚定日期: 演示窗口是固定的(见 simulator.ANCHOR),
+    # 不能跟着 runner 的时区/日期走, 否则产物会随"跑在哪一天"漂移。
+    con.execute(ELT.replace("current_date", f"DATE '{simulator.ANCHOR.isoformat()}'"))
+    sl = SemanticLayer(con=con, anchor=simulator.ANCHOR)
     # 可加性以 YAML 为准(单一事实源); DERIVED_ADDITIVE 仅作兼容兜底
     ADDITIVE_METRICS = {n for n, mm in sl.metrics.items()
                         if mm.get("additivity", "additive" if n in DERIVED_ADDITIVE else "non_additive")
@@ -360,9 +367,9 @@ def main():
         return k
 
     dash = {
-        "generated_at": str(date.today()),
+        "generated_at": str(simulator.ANCHOR),
         # as_of: 有些指标(如付费留存)是"构建日快照", 页面必须同时展示 as-of, 否则"近14天"会失真
-        "as_of": str(date.today()),
+        "as_of": str(simulator.ANCHOR),
         "kpis": [kpi("active_creators", "7d"), kpi("creations_per_active_user", "7d"),
                  kpi("weekly_successful_creations", "7d"), kpi("weekly_minutes_generated", "7d"),
                  kpi("payer_retention_wow", "14d"), kpi("company_gross_margin", "14d"),

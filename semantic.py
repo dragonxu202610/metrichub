@@ -20,11 +20,15 @@ WINDOWS = {"1d": 1, "7d": 7, "14d": 14, "30d": 30}
 
 
 class SemanticLayer:
-    def __init__(self, yaml_path=None, con=None):
+    def __init__(self, yaml_path=None, con=None, anchor=None):
         with open(yaml_path or ROOT / "metrics.yaml", encoding="utf-8") as f:
             doc = yaml.safe_load(f)
         self.metrics = {m["name"]: m for m in doc["metrics"]}
         self.con = con
+        # 窗口的"今天"。演示数据锚定在固定日期(见 simulator.ANCHOR), 所以消费端也必须用同一个锚,
+        # 否则 UTC runner 与本地时区差一天会让"同一次构建"里出现两个基准日。
+        # 不传则退回系统日期(真实生产场景)。
+        self.anchor = anchor
 
     # ---------- ① 编译: 口径的唯一出口 ----------
     def compile(self, name, dims=None, window=None, end=None, extra_where=None,
@@ -43,7 +47,7 @@ class SemanticLayer:
         window = window or m.get("default_time", "14d")
         if window not in WINDOWS:
             raise ValueError(f"{name}: 不支持的时间窗 {window!r}; 可选={sorted(WINDOWS)}")
-        end = end or date.today()
+        end = end or self.anchor or date.today()
         start = end - timedelta(days=WINDOWS[window] - 1)
         dc = m.get("date_field", "dt")
         # 兼容历史开关: time_series=True 等价于 granularity='daily'

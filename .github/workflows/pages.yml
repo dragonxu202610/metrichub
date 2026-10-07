@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "30 3 * * *"   # 每日 UTC 03:30 重放数据并发布新快照
+    - cron: "30 3 * * *"   # 每日重跑一次流水线, 确认七道门禁仍然可绿(数据窗口锚定在 2026-10-08, 产物确定)
   workflow_dispatch:
 
 permissions:

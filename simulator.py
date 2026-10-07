@@ -12,6 +12,13 @@ from pathlib import Path
 DATA = Path(__file__).parent / "data"
 DAYS = 14
 SEED = 20261008
+# 演示窗口锚定到固定日期, 不用 date.today()。
+# 为什么: 页面上的日期与数字是**随源码一起提交**的, 数据必须能在任何机器、任何时区、任何一天复现 ——
+#   · GitHub runner 用 UTC, 与本机(UTC+8)差一天 → 窗口整体前移, 页面里 "10-07→10-08" 这类日期对
+#     在新数据里根本不存在, evidence.py 的举证门禁直接失败(CI 首跑就是这么挂的);
+#   · 每日 cron 重放会让已发布的页面数字与产物不再一致, 门禁必然变红。
+# 变的应该是"你看它的那一天", 不是数据本身。
+ANCHOR = date(2026, 10, 8)
 
 # (渠道, 类型, 注册占比)
 CHANNELS = [("google-organic", "seo", .28), ("bing-organic", "seo", .06), ("reddit-organic", "seo", .05),
@@ -47,7 +54,7 @@ def main():
     files = {k: open(DATA / f"{k}.jsonl", "w", encoding="utf-8")
              for k in ["users", "events", "tasks", "orders", "credits", "spend", "touch"]}
     pool = []
-    today = date.today()
+    today = ANCHOR
 
     for day_idx in range(DAYS):
         d = today - timedelta(days=DAYS - 1 - day_idx)

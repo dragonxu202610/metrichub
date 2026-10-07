@@ -87,4 +87,7 @@ git remote add origin https://github.com/<user>/metrichub.git && git push -u ori
 # 仓库 Settings → Pages → Source 选 GitHub Actions, 然后手动 Run workflow
 ```
 
-工作流每日自动重放数据并发布新快照。数据均为模拟生成，仅作架构演示。
+工作流每次 push 到 `main` 都会重放数据、跑七道门禁、发布快照；`cron` 每日重跑一次确认流水线仍然可绿。
+**数据窗口锚定在固定日期 2026-10-08（`simulator.ANCHOR`），不跟随系统日期** —— 页面与 README 里的数字
+是随源码一起提交的，数据必须能在任何机器、任何时区、任何一天复现，否则 UTC runner 与本地时区差一天
+就会让 `evidence.py` 的日期对举证直接失败。数据均为模拟生成，仅作架构演示。
