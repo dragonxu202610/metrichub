@@ -1,0 +1,49 @@
+name: pages
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 3 * * *"   # 每日 UTC 03:30 重放数据并发布新快照
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 动作版本必须在 Node 24 系(major 见下): Node 20 已于 2026-09-23 从 GitHub Actions 移除,
+      # 任何 runs.using: node20 的动作都会直接失败 —— 升级时先确认目标 major 是 node24。
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install duckdb pyyaml
+      - run: python build.py --fresh
+      # 可信度门禁: 自检不过就不发布 —— "可信"必须是流水线的硬约束, 不是本地习惯
+      - run: python check.py --data
+      - run: python evidence.py
+      - run: python northstar_eval.py
+      - run: python js_syntax_probe.py
+      - run: python compare_out.py
+      - run: python verify_served.py --dir
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

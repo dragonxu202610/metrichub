@@ -1,0 +1,638 @@
+# ============================================================
+# MetricHub 语义层 —— 指标的单一事实源
+# ============================================================
+# 每个指标 = 一次定义, 三处消费: 看板(SQL编译) / API / AI问答(上下文+工具)
+# 字段说明:
+#   name         唯一标识(AI 工具调用的入口)
+#   title/desc   人话名称与口径描述(注入 AI 上下文, 消灭同义词歧义)
+#   group        归属业务域(北极星/增长/产品/商业化/模型/归因)
+#   basis        物理表(DWD/DWS) —— 语义层不直捣业务库
+#   expr         聚合表达式(编译进 SELECT)
+#   dimensions   可下钻维度
+#   default_time 默认时间窗口(AI 问答未指明时使用 —— 消灭隐式默认)
+#   grain        输出语义: window=窗口内聚合成单值 / daily=按日期逐日值
+#                (同一指标名只对应一种粒度, 消费端用 query_metric(granularity=...) 显式选择)
+#   series_grain 能否做逐日趋势: daily=可以 / none=去重·比率类, 逐日拆分语义不成立
+#   unit         单位(count/percent/usd/min)
+#   version      口径版本(变更需升版, 消灭"口径漂移")
+#   notes        口径争议与变更记录(治理痕迹)
+# ============================================================
+
+metrics:
+  # ---------- 北极星 ----------
+  # grain 语义: window = 窗口内单值; daily = 逐日值
+  # series_grain: daily = 可安全逐日拆分; none = 逐日拆分语义错误(如"去重付费用户"不能按日相加)
+  - name: weekly_successful_creations
+    title: 周成功创作数
+    group: north_star
+    desc: 近7个自然日成功完成的视频生成任务总数(消耗·规模口径, 与消耗积分同向)
+    owner: data
+    version: 1
+    basis: dwd_task_ch
+    expr: count(*) FILTER (WHERE success)
+    dimensions: [model, platform, channel]
+    default_time: 7d
+    unit: count
+    grain: window
+    additivity: additive
+    series_grain: daily
+    notes: |
+      定位: "消耗·规模"口径, 不承担北极星(公司北极星是 active_creators);
+      候选B(分钟)见 minutes_generated 与 weekly_minutes_generated。
+      ① 名称含"周"但 grain=window, 与逐日值同源不同量 ——
+      消费端必须显式区分(逐日形态单独注册为 daily_successful_creations);
+      ② 一次 2 秒生成与一次 12 秒生成同记 1, 而成本按秒计费 —— 计量单位与成本单位不同构;
+      ③ basis 用 dwd_task_ch, 维度含 channel, 增长域可按获取渠道归因。
+
+  - name: daily_successful_creations
+    title: 日成功创作数
+    group: north_star
+    desc: 当日成功完成的视频生成任务数(周成功创作数的逐日拆解, 用于看趋势)
+    owner: data
+    version: 1
+    basis: dwd_task_ch
+    expr: count(*) FILTER (WHERE success)
+    dimensions: [model, platform, channel]
+    default_time: 1d
+    unit: count
+    grain: daily
+    additivity: additive
+    series_grain: daily
+
+  - name: minutes_generated
+    title: 日生成视频分钟数
+    group: north_star
+    desc: 当日成功任务的视频秒数合计/60
+    owner: data
+    version: 1
+    basis: dwd_task
+    expr: round(sum(seconds) FILTER (WHERE success) / 60.0, 1)
+    dimensions: [model]
+    default_time: 1d
+    unit: min
+    grain: daily
+    additivity: additive
+    series_grain: daily
+
+  - name: weekly_minutes_generated
+    title: 周生成视频分钟数
+    group: north_star
+    desc: 近7个自然日成功任务的视频秒数合计/60(消耗·成本视角：与厂商按秒计费同构, 长视频权重大)
+    owner: data
+    version: 2
+    basis: dwd_task
+    expr: round(sum(seconds) FILTER (WHERE success) / 60.0, 1)
+    dimensions: [model]
+    default_time: 7d
+    unit: min
+    grain: window
+    additivity: additive
+    series_grain: daily
+    notes: |
+      可加(流量类): 逐日形态 = 按日重算的滚动 7 日累计, 由 minutes_generated 派生, 不是把窗口值摊平。
+      与 weekly_successful_creations 的区别是"按价值量"而非"按次数"计。
+      真实平台的视频时长上限通常远大于本演示的 2-12 秒(模拟器设定), 故本指标的量级
+      不代表生产环境; 它演示的是口径选择, 不是绝对值。
+
+  - name: active_creators
+    title: 周活跃创作者数
+    group: north_star
+    # ★ 当前生效的公司北极星(唯一)。改这里必须同步 check.py 的唯一性断言与全站文案。
+    north_star_status: approved
+    desc: 近7个自然日内完成≥1次成功生成的去重用户数(公司北极星：衡量"有多少人在持续得到价值")
+    owner: data
+    version: 1
+    basis: dwd_task_ch
+    expr: count(DISTINCT user_id) FILTER (WHERE success)
+    dimensions: [channel, country, platform]
+    default_time: 7d
+    unit: count
+    grain: window
+    additivity: non_additive
+    series_grain: daily
+    # 去重类指标的"趋势"不能用逐日相加, 必须用窗口函数按日重算滚动去重:
+    # count(DISTINCT user_id) OVER (PARTITION BY dt ORDER BY dt RANGE 7 DAY)
+    rolling_distinct_on: user_id
+    notes: |
+      为什么用"人"而不是"次/分钟"(见「北极星审计」页 §01):
+      订阅制的续费信号是"还有多少人在持续创作", 而不是产出总量 ——
+      产出计数器可以被少数重度用户或赠送额度撑起来, 创作者数不会。
+      配套: creations_per_active_user(深度) / weekly_successful_creations(消耗) /
+      weekly_minutes_generated(成本视角) / churn 与毛利类护栏指标。
+      已知缺口: 渠道归因依赖 dwd_task_ch 的 channel 字段(已通过 join 解决);
+      逐日值由窗口函数滚动去重产出(rolling_distinct_on), 不可把逐日点相加。
+
+  - name: creations_per_active_user
+    title: 人均成功创作数
+    group: north_star
+    desc: 窗口内成功创作数 / 有创作的活跃创作者数(北极星拆解树中一度缺失的"人均"因子)
+    owner: data
+    version: 1
+    basis: dwd_task_ch
+    expr: round(1.0 * count(*) FILTER (WHERE success) / greatest(count(DISTINCT user_id) FILTER (WHERE success), 1), 2)
+    dimensions: [platform, channel]
+    default_time: 7d
+    unit: count
+    grain: window
+    additivity: non_additive
+    series_grain: none
+
+  - name: first_day_creations
+    title: 新用户首日成功创作数
+    group: north_star
+    desc: 注册当日即完成成功生成的用户数(把新增侧的"激活"翻译成北极星的单位)
+    owner: growth
+    version: 1
+    basis: dwd_user
+    date_field: signup_dt
+    expr: count(*) FILTER (WHERE activated_1d)
+    dimensions: [channel, country]
+    default_time: 7d
+    unit: count
+    grain: window
+    additivity: additive
+    series_grain: daily
+    notes: |
+      北极星拆解树的新增侧分支 = 新增注册 × 激活率 × 新用户人均创作;
+      本指标是该分支的绝对值形态, 与 activation_1d(比率形态)互为印证。
+
+  # ---------- 增长 ----------
+  - name: new_users
+    title: 日新注册用户
+    group: growth
+    desc: 当日完成注册的去重新用户数
+    owner: growth
+    version: 1
+    basis: dwd_user
+    date_field: signup_dt
+    expr: count(*)
+    dimensions: [channel, country, platform]
+    default_time: 1d
+    unit: count
+    grain: daily
+    additivity: additive
+    series_grain: daily
+
+  - name: dau
+    title: 日活跃用户
+    group: growth
+    desc: 当日有≥1条页面事件的去重用户(含Web与App, 排除测试账号)
+    owner: data
+    version: 2
+    basis: dwd_event
+    expr: count(DISTINCT user_id)
+    dimensions: [platform, country]
+    default_time: 1d
+    unit: count
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    notes: |
+      口径: "活跃"定义为当日有页面事件(与 WAU 同一口径组), 不是"有登录".
+      未实现项: desc 里的"排除测试账号"目前没有对应过滤(演示数据无测试账号), 生产需加 is_test 标记.
+      注意: 去重类指标跨日不可相加(DAU 求和无意义), 上游若把逐日点加总即为口径事故.
+
+  - name: seo_signup_share
+    title: SEO渠道注册占比
+    group: growth
+    desc: 首触渠道为自然搜索(SEO)的新用户 / 全部新用户
+    owner: growth
+    version: 1
+    basis: dwd_user
+    date_field: signup_dt
+    expr: round(100.0 * count(*) FILTER (WHERE channel_type = 'seo') / count(*), 1)
+    dimensions: [country]
+    default_time: 7d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+
+  - name: cac
+    title: 渠道获客成本
+    group: growth
+    desc: 付费渠道花费 / 该渠道新用户数(仅对有花费的渠道有意义)
+    owner: growth
+    version: 1
+    basis: dws_channel_day
+    expr: round(sum(spend) / greatest(sum(new_users), 1), 2)
+    dimensions: [channel]
+    default_time: 7d
+    unit: usd
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    notes: |
+      口径争议: 免费渠道(SEO/直达)花费为0, CAC 无意义, 看板按"仅付费渠道"过滤.
+
+  # ---------- 产品/激活 ----------
+  - name: activation_1d
+    title: 当日激活率
+    group: product
+    desc: 注册当日完成≥1次成功生成任务的新用户占比
+    owner: product
+    version: 2
+    basis: dwd_user
+    date_field: signup_dt
+    expr: round(100.0 * count(*) FILTER (WHERE activated_1d) / count(*), 1)
+    dimensions: [channel, platform]
+    default_time: 7d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    cohort_maturity_days: 1
+    notes: |
+      口径争议: 激活定义有 1d/7d 两派 —— 语义层双注册(见 activation_7d), 让分歧可见而非互斥.
+      队列成熟度: "注册当日"意味着最近 1 天的注册队列尚未走完, 末点会被系统性低估.
+
+  - name: activation_7d
+    title: 7日激活率
+    group: product
+    desc: 注册后7个自然日内完成≥1次成功生成的新用户占比
+    owner: product
+    version: 1
+    basis: dwd_user
+    date_field: signup_dt
+    expr: round(100.0 * count(*) FILTER (WHERE activated_7d) / count(*), 1)
+    dimensions: [channel]
+    default_time: 7d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    cohort_maturity_days: 7
+    notes: |
+      队列成熟度: "注册后 7 个自然日内激活"意味着最近 7 天的注册队列尚未走完观察期,
+      窗口末点必然被低估(序列末 5 天持续下滑是日历截断, 不是转化崩塌)。
+      看板已按 cohort_maturity_days 标注; 生产版应把末日出参置 null 而非 0,
+      否则"尚未观测"会被读成"转化率 0%"。
+
+  - name: ttfc_median
+    title: 激活速度中位数(注册→首次生成)
+    group: product
+    desc: 新用户从注册到首次成功生成的间隔分钟中位数(仅统计已激活用户)
+    owner: product
+    version: 1
+    basis: dwd_user
+    date_field: signup_dt
+    expr: round(median(ttfc_min) FILTER (WHERE activated_7d), 0)
+    dimensions: [channel]
+    default_time: 14d
+    unit: min
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    notes: |
+      口径: 用带分钟精度的 ts 列(CAST(ts AS TIMESTAMP))计算注册→首次成功生成的真实间隔,
+      取值落在 0~1440 分钟之间。若退回按日期相减, 结果只剩 0/1440 两个值,
+      分钟中位数就退化成是否当日生成的布尔量。
+      口径边界: 注册时间按当日 00:00 计(users 表只有日期), 故分钟数相对真实注册时刻偏大,
+      生产需接入带时分的注册事件时间。
+    cohort_maturity_days: 7
+
+  - name: retention_d1
+    title: 次日留存率
+    group: product
+    desc: 注册日 Cohort 在注册次日当天仍有页面活动的比例(严格次日, 不是"此后任意一天")
+    owner: product
+    version: 2
+    basis: dwd_user
+    date_field: signup_dt
+    expr: round(100.0 * count(*) FILTER (WHERE retained_d1) / nullif(count(*) FILTER (WHERE age_days >= 1), 0), 1)
+    dimensions: [channel]
+    default_time: 14d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    cohort_maturity_days: 1
+    notes: |
+      口径: 分子只认"注册次日当天"有活动(dwd_user.retained_d1 由 ELT 按 signup_dt+1 精确判定)。
+      若写成 max(活跃日) >= signup+1, 那是"D1 或以后任意一天"的无界滚动留存 ——
+      会把 14 天后才回来的人也计入次日留存(实测 84.2%, 而真值只有 48.1%)。
+      队列成熟度: 窗口最后一天的注册队列尚未走完次日, 分母为 0, 该点出参 null(不是 0) ——
+      消费端必须渲染为"未观测", 不得读成 0%。
+
+  - name: effect_penetration
+    title: 特效工坊渗透率
+    group: product
+    desc: 使用过特效工坊页面的活跃用户 / 全部活跃用户(病毒拉新入口的健康度)
+    owner: product
+    version: 1
+    basis: dwd_event
+    expr: round(100.0 * count(DISTINCT user_id) FILTER (WHERE page = 'effects') / count(DISTINCT user_id), 1)
+    dimensions: [platform]
+    default_time: 7d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+
+  # ---------- 商业化 ----------
+  - name: paying_users
+    title: 付费用户数
+    group: monetization
+    desc: 近7个自然日内有≥1笔非退款订单的去重用户(含Web与App, 含Lite/Pro/Max)
+    owner: monetization
+    version: 3
+    basis: dwd_order
+    expr: count(DISTINCT user_id) FILTER (WHERE NOT refund)
+    dimensions: [plan, country]
+    default_time: 7d
+    unit: count
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      只计非退款订单: 含退款的版本会把薅羊毛者算成付费用户.
+      窗口口径: desc 与 default_time 一致按"近 7 个自然日"表述, 不与"当日"混用.
+      去重用户不可按日相加, series_grain=none; 若要看逐日趋势需另注册"日付费用户数".
+
+  - name: payers_ratio
+    title: 累计付费渗透率
+    group: monetization
+    desc: 窗口内注册用户中曾付费的比例(ever_paid 由 dwd_user 宽表派生)
+    owner: monetization
+    version: 2
+    basis: dwd_user
+    date_field: signup_dt
+    expr: round(100.0 * count(*) FILTER (WHERE ever_paid) / count(*), 1)
+    dimensions: [channel]
+    default_time: 14d
+    unit: percent
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    cohort_maturity_days: 1
+    notes: |
+      窗口口径: 分母=窗口内注册用户数, 分子=其中曾付费的用户数; 比率不可跨窗口相加.
+      队列成熟度: 窗口末日注册的用户当天不可能有过付费行为, 末点会被系统性低估(看板已标注)。
+
+  - name: arppu
+    title: 付费用户人均收入
+    group: monetization
+    desc: 时间窗内非退款订单金额 / 去重付费用户数(无付费用户时出参 null, 不是 0)
+    owner: monetization
+    version: 3
+    basis: dwd_order
+    expr: round(sum(amount) FILTER (WHERE NOT refund) / nullif(count(DISTINCT user_id) FILTER (WHERE NOT refund), 0), 2)
+    dimensions: [country, plan]
+    default_time: 14d
+    unit: usd
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      窗口口径: 分子=窗口内非退款金额, 分母=窗口内去重付费用户数; 比率不可跨窗口相加.
+      分母必须 nullif(...,0): 窗口内没有付费用户时, 裸除法在 DuckDB 里得到 inf,
+      而 json.dumps 会把 inf 写成 Infinity —— 那是**非法 JSON**, 前端 fetch().json() 会直接抛错.
+      出参 null 表示"该窗口没有付费用户, 人均收入无定义", 消费端不得读作 0.
+
+  - name: revenue_daily
+    title: 日订阅收入
+    group: monetization
+    desc: 当日非退款订单金额合计(美元)
+    owner: monetization
+    version: 1
+    basis: dwd_order
+    expr: round(sum(amount) FILTER (WHERE NOT refund), 2)
+    dimensions: [plan]
+    default_time: 1d
+    unit: usd
+    grain: daily
+    additivity: additive
+    series_grain: daily
+
+  - name: free_credit_burn_rate
+    title: 免费额度燃烧率
+    group: monetization
+    desc: 窗口内消耗积分 / 窗口内免费发放积分(注册赠送+登录奖励)；<55% 触发告警——免费额度沉淀过多
+    owner: monetization
+    version: 2
+    basis: dwd_credits
+    expr: round(100.0 * (-sum(credits) FILTER (WHERE change_type = 'consume')) / nullif(sum(credits) FILTER (WHERE change_type IN ('signup_grant', 'grant_daily')), 0), 1)
+    dimensions: []
+    default_time: 7d
+    unit: percent
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      告警语义 = 分母只算**免费**发放。旧口径把付费购买的订阅附赠也放进分母(占发放 34%),
+      于是"卖不动"被误报成"发太多": 免费口径 57.6~81.8%, 混合口径却有 12/14 天低于 55% 触发告警。
+      口径边界: 分子是窗口内消耗总量 —— 台账没有"这一笔消耗来自哪次发放"的来源字段,
+      不编造来源拆分, 故本指标回答"送出去的积分相对消耗够不够快", 不是精确的免费池消耗率;
+      且分子是存量消耗(花历史余额)、分母是当期发放, 两者不同基。精确化需台账登记资金来源。
+      分母写死枚举: 台账新增 change_type(过期/回收/补偿)必须显式登记, 不会被自动算进分母。
+
+  - name: paid_credit_burn_rate
+    title: 付费积分燃烧率
+    group: monetization
+    desc: 窗口内消耗积分 / 窗口内付费发放积分(订阅附赠) —— 已售积分被用掉的比例
+    owner: monetization
+    version: 1
+    basis: dwd_credits
+    expr: round(100.0 * (-sum(credits) FILTER (WHERE change_type = 'consume')) / nullif(sum(credits) FILTER (WHERE change_type = 'subscribe_grant'), 0), 1)
+    dimensions: []
+    default_time: 7d
+    unit: percent
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      与免费额度用同一个分子、换一个分母, 见 free_credit_burn_rate 的口径边界。
+      >100% 表示当期消耗超过了当期售出的积分 —— 用户在同时花存量余额, 属正常,
+      但必须与积分负债余额一起看, 不能单独读作"超支"。
+
+  # ---------- 模型域 ----------
+  - name: model_gross_margin
+    title: 模型毛利率
+    group: model
+    desc: (收入 - API成本)/收入。收入=当期实收现金(非退款订单)按各模型消耗积分占比分摊; 成本=成功秒数×厂商单价
+    owner: model_infra
+    version: 2
+    basis: dws_model_day
+    expr: round(100.0 * (sum(revenue_usd) - sum(api_cost_usd)) / nullif(sum(revenue_usd), 0), 1)
+    dimensions: [model]
+    default_time: 14d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+    notes: |
+      收入口径: **现金口径** —— 只认当期实收订单金额, 再按各模型当日消耗积分占比分摊到模型。
+      旧口径"消耗积分 × $0.04 混合单价"会把白送额度的燃烧也记成收入(14 天消耗 92,185,
+      而已售发放只有 65,900), 使公司毛利率虚高到 33.1%, 现金口径只有 12.9%。
+      现金口径下本指标的分母与 revenue_daily 完全对齐, 两个 unit=usd 的"收入"不再互相矛盾。
+      剩余简化: 现金当期全额确认, 未做递延收入(已售未消耗积分的负债)与按套餐分摊单价。
+      成本单价为公开定价的粗略估算(模拟), 非实际采购价; 失败任务成本为 0
+      (模拟器对失败任务写 seconds=0, 不产生厂商成本) —— 生产若厂商对失败调用计费, 需补该口径。
+
+  - name: model_success_rate
+    title: 模型成功率
+    group: model
+    desc: 成功任务数 / 总任务数, 按模型
+    owner: model_infra
+    version: 1
+    basis: dws_model_day
+    expr: round(100.0 * sum(success_calls) / greatest(sum(calls), 1), 1)
+    dimensions: [model]
+    default_time: 14d
+    unit: percent
+    grain: daily
+    additivity: non_additive
+    series_grain: daily
+
+  # ---------- 归因 ----------
+  - name: channel_revenue_first_touch
+    title: 渠道归因收入(首触)
+    group: attribution
+    desc: 按用户注册渠道(首次触点)归因的非退款订单金额 —— 评估渠道获客质量
+    owner: growth
+    version: 1
+    basis: dwd_order
+    expr: round(sum(amount) FILTER (WHERE NOT refund), 2)
+    dimensions: [channel]
+    default_time: 14d
+    unit: usd
+    grain: daily
+    additivity: additive
+    series_grain: daily
+    notes: |
+      归因双口径说明: 首触看获客质量, 线性看助攻价值(channel_revenue_linear), 两口径共存禁止混用.
+
+  - name: channel_revenue_linear
+    title: 渠道归因收入(线性)
+    group: attribution
+    desc: 订单金额在用户全部触点渠道间平分(触点=注册前30天内的渠道曝光/点击记录) —— 评估SEO等助攻渠道
+    owner: growth
+    version: 1
+    basis: dwd_order
+    expr: round(sum(amount / touch_cnt) FILTER (WHERE NOT refund), 2)
+    dimensions: [channel]
+    default_time: 14d
+    unit: usd
+    grain: daily
+    additivity: additive
+    series_grain: daily
+    notes: |
+      演示数据中 touch_cnt 由模拟器按用户触点数生成, 与渠道类型无关 ——
+      因此本口径对每个渠道≈首触×(1/平均触点数) (实测比值 0.48~1.0 且各渠道单调一致),
+      两口径给出的渠道排序几乎相同, 并不能区分"助攻型"渠道.
+      desc 里承诺的"注册前30天曝光/点击"在演示数据里无法实现(touch 表无时间戳与触点类型)。
+      结论: 本指标当前【不可用于预算决策】, 只作口径演示; 看板已加显式标注。
+      生产修正: 触点数按渠道类型分布 + touch 表补 dt/touch_type/source 后再启用; 详见 README 已知限制。
+
+  # ---------- 护栏(公司级健康度, 防止为拉高北极星而损伤公司) ----------
+  - name: roas
+    title: 渠道投放回报率
+    group: growth
+    desc: 窗口内该渠道首触归因收入 / 窗口内该渠道花费 —— 付费渠道的预算取舍依据
+    owner: growth
+    version: 2
+    basis: dws_channel_roas
+    expr: round(sum(revenue_attr) / greatest(sum(spend), 1), 2)
+    dimensions: [channel]
+    default_time: 14d
+    unit: ratio
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      回归窗口: 演示只有 14 天, 故这是"当期 ROAS"而非"回收期口径"; 生产应做 cohort 回收曲线
+      (Day7/Day30 ROAS)与 CAC 回收期。
+      重大口径限制(推断): 免费渠道(SEO/直达/联盟)花费为 0 → ROAS 分母为 0, 该渠道永远排第一。
+      而 SEO 在典型团队里是十几到二十人的人力成本(推断, 非实测) —— 不把内容/人力/工具成本计入 channel_spend, 这张表开预算会就是制造冲突。
+      生产修正: channel_spend 纳入 SEO 内容人力与外链成本; 在此之前本指标只读付费渠道。
+
+  - name: payer_retention_wow
+    title: 付费留存率(周环比)
+    group: monetization
+    desc: 上周有非退款订单的用户中, 本周仍有非退款订单的比例(订阅制最直接的续费代理)
+    owner: monetization
+    version: 1
+    basis: dws_payer_cohort
+    expr: round(100.0 * sum(retained) / greatest(sum(prev_payers), 1), 1)
+    dimensions: [plan]
+    default_time: 14d
+    unit: percent
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      为什么不用"churn/NRR": 本演示只有 14 天数据, 真 churn 与 NRR 需要 90 天以上队列
+      (订阅周期 LITE/PRO 按月, 模拟器 7 天续订是压缩设定)。
+      本指标是"付费留存"的最小可用代理, 窗口由 SQL 里的 current_date 相对区间固定为"本周 vs 上周"。
+      生产升级: 月度队列 NRR + logo churn, 需要 dwd_subscription 事实表(当前不存在)。
+      快照语义: 本表只有一行, dt = 构建当天, 故该值永远是"构建日那一周的回看值"。
+      若快照不是当天构建(Pages cron 失败 / 隔天打开演示), 页面上的"近14天"会失真 ——
+      消费端必须同时展示 as_of(见 build.py 写入的 as_of 字段), 不得只报数字。
+
+  - name: balance_capped_revenue_gap
+    title: 余额截断收入缺口
+    group: monetization
+    desc: (已计费秒数 - 实扣积分) × $0.04 —— 免费额度不足导致"生成了但收不到钱"的部分(负毛利的直接来源)
+    owner: monetization
+    version: 1
+    basis: dwd_task
+    expr: round(coalesce(sum(seconds - credits) FILTER (WHERE success), 0) * 0.04, 2)
+    dimensions: [model]
+    default_time: 14d
+    unit: usd
+    grain: window
+    additivity: additive
+    series_grain: daily
+    notes: |
+      这是"负毛利"的真实来源(成本口径): 成本按成功秒数×厂商单价计, 而收入按实扣积分计,
+      模拟器里 cost = min(balance, secs) —— 余额不足时秒数照记、收入缩水。
+      同时它也解释了为什么"高成本档"与"负毛利"不是一回事:
+      低档位模型($0.025, 低于阈值)在本演示里也只有 +10.0% 毛利, 正是被这一项吃掉。
+      口径边界: 本指标只度量"因余额截断丢失的收入", 不含退款与套餐折扣;
+      生产环境需替换为"免费额度发放额 × 未消耗率 + 未计费超时"的真实口径。
+
+  - name: company_gross_margin
+    title: 公司级毛利率
+    group: model
+    desc: (实收现金 - 全部模型API成本)/实收现金 —— 与 model_gross_margin 同口径, 只是不按模型分组
+    owner: model_infra
+    version: 2
+    basis: dws_company_day
+    expr: round(100.0 * (sum(revenue_usd) - sum(api_cost_usd)) / nullif(sum(revenue_usd), 0), 1)
+    dimensions: []
+    default_time: 14d
+    unit: percent
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      CEO/护栏视角: 北极星(创作者数)上升但公司毛利率下降, 就是"亏本换增长"的信号 ——
+      这正是 northstar.html §06 给出的推翻条件之一所依赖的指标。
+      口径同 model_gross_margin: 收入=当期实收现金(非退款订单)按消耗积分占比分摊, 成本=成功秒数×厂商单价(估算)。
+      现金口径下本指标的分母与 revenue_daily 完全对齐 —— 旧的"消耗积分×$0.04"口径会把
+      白送额度的燃烧当收入, 使这条护栏虚高(33.1% vs 现金 12.9%), 等于护栏失效。
+      不提供日序列(series_grain=none): 窗口比率无法由逐日比率求和或平均得到 ——
+      那两者不是同一个量(实测日均 3.14 vs 窗口 12.90)。护栏看的是窗口值, 不需要日线。
+
+  - name: high_cost_exposure
+    title: 高成本模型曝光占比
+    group: model
+    desc: 落在高采购成本档(≥$0.03/秒)的成功任务占全部成功任务的比例 —— 流量有多少押在最贵的模型上
+    owner: model_infra
+    version: 2
+    basis: dws_cost_tier_day
+    expr: round(100.0 * sum(success_high_cost) / greatest(sum(success_high_cost) + sum(success_low_cost), 1), 1)
+    dimensions: []
+    default_time: 14d
+    unit: percent
+    grain: window
+    additivity: non_additive
+    series_grain: none
+    notes: |
+      阈值说明: $0.03/秒 是**经验运营阈值**, 不是从定价推导出来的; 生产应改为动态计算
+      break_even = 窗口内收入 / 窗口内成功秒数(见 dws_cost_tier_day 注释)。
+      现金口径下的平衡点: 实收 $2,829 / 130,566 成功秒 ≈ $0.0217/秒 ——
+      高于它的模型基本负毛利。所以 $0.03 这条线**偏保守**: Kling 2.5($0.022) 与 Runway($0.025)
+      其实已经负毛利, 却不在本指标的分子里。本指标只声明它实际度量的东西: 高成本档任务占比。
+      不提供日序列(series_grain=none): 窗口比率不能由逐日比率求和/平均得到(与 KPI 不同量)。
+      本指标只声明它实际度量的东西: 高成本档任务占比。负毛利的直接证据看 balance_capped_revenue_gap。

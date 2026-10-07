@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>业务解构 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .badge-inf{display:inline-block;font-size:10.5px;font-weight:700;color:var(--amber);
+             border:1px solid #e0cfa4;background:#fdf8ec;border-radius:4px;padding:0 7px;
+             vertical-align:2px;margin-left:8px;letter-spacing:1px}
+  .fig{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 10px;margin:14px 0;overflow-x:auto}
+  .fig svg{display:block;margin:0 auto;min-width:760px}
+  .fig figcaption,.figcap{text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
+  .vsg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+  @media(max-width:840px){.vsg{grid-template-columns:1fr}}
+  .vs{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:16px 20px}
+  .vs h4{font-size:14.5px;margin-bottom:8px}
+  .vs ul{list-style:none}
+  .vs li{font-size:12.8px;color:var(--muted);padding:2px 0 2px 16px;position:relative}
+  .vs li:before{content:"";position:absolute;left:2px;top:11px;width:5px;height:5px;border-radius:50%;background:var(--line)}
+  .vs.good li:before{background:var(--good)} .vs.bad li:before{background:var(--bad)}
+  .stage{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:14px 0}
+  @media(max-width:840px){.stage{grid-template-columns:1fr}}
+  .stg{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--card);position:relative}
+  .stg.now{border-color:var(--accent);background:var(--accent-wash)}
+  .stg b{font-family:var(--serif);font-size:15px}
+  .stg .sn{font-size:11px;color:var(--muted);letter-spacing:2px}
+  .stg p{font-size:12.3px;color:var(--muted);margin-top:4px}
+  @media(max-width:840px){#dmap{grid-template-columns:1fr !important}}
+  .dcard{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:14px 16px}
+  .dcard .dhead{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+  .dcard .dname{font-family:var(--serif);font-weight:700;font-size:14.5px}
+  .dcard .dcount{font-size:11px;color:var(--muted)}
+  .dcard .dduty{font-size:11.8px;color:var(--muted);margin-bottom:8px}
+  .dchip{display:block;font-size:11.8px;padding:3px 9px;border-radius:5px;margin:3px 0;
+         background:#f4f2ec;color:#3d4350;border:1px solid var(--line)}
+  .dchip:hover{border-color:var(--accent)}
+  .dcard.k .dchip{background:#eef1fb;border-color:#ccd5ef}
+  .dcard.g .dchip{background:#ecf5f0;border-color:#c4e0d2}
+  .dcard.p .dchip{background:#f9f3e6;border-color:#e8d9b0}
+  .dcard.m .dchip{background:#f1ecfd;border-color:#d9cdf0}
+  .dcard.o .dchip{background:#fdeef0;border-color:#eed0d5}
+  .dcard.a .dchip{background:#eef4f6;border-color:#cfe0e6}
+</style>
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item" href="index.html">总览</a>
+  <a class="item on" href="business.html">业务解构</a>
+  <a class="item" href="northstar.html">北极星审计</a>
+  <a class="item" href="dashboard.html">看板</a>
+  <a class="item" href="layer.html">语义层</a>
+  <a class="item" href="ai.html">AI 问答</a>
+  <span class="right">推断画像 · 供检验</span>
+</div></nav>
+<main>
+  <div class="hero" style="padding-bottom:0">
+    <div class="eyebrow">DECONSTRUCT BEFORE YOU BUILD</div>
+    <h1 style="font-size:28px">业务解构</h1>
+    <p class="lead" style="font-size:14.5px">本站全部业务设定（数据模型、指标、模拟行为）都建立在这一页的推断之上。
+    <b>推断不准，后面只会更不准</b>——所以先把推断亮出来，而不是藏在代码里。</p>
+  </div>
+
+  <div class="tip-inf">
+    <b>推断声明</b>：以下画像基于公开信息（此类平台的产品面、融资报道、招聘信息）推断，<b>不涉及任何公司内部数据</b>。
+    所有标注 <span class="badge-inf">推断</span> 的内容均欢迎被事实修正——修正画像后重跑 build，指标体系随之更新，这正是"口径即代码"的工作方式。
+  </div>
+
+  <h2 class="sec"><span class="no">01</span>业务域结构 <span class="badge-inf">推断</span></h2>
+  <p class="desc">按"钱从哪来、流量从哪来、价值在哪交付"切分。注意右下角的数据域——它是唯一服务所有域的域，产出必须能用"帮哪个域做了什么决策"度量。</p>
+  <div class="fig">
+  <svg viewBox="0 0 960 430" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,Microsoft YaHei,sans-serif">
+    <defs><marker id="ba" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6" fill="none" stroke="#b9b3a4" stroke-width="1.2"/></marker></defs>
+    <g font-size="12.5" text-anchor="middle" font-weight="600">
+      <!-- 上排三域 -->
+      <rect x="40"  y="40" width="250" height="78" rx="9" fill="#eef1fb" stroke="#c4cdea" stroke-width="1.3"/>
+      <text x="165" y="68" fill="#32499c">① 增长域 Growth</text>
+      <text x="165" y="90" font-weight="400" fill="#8b8f98" font-size="11.5">SEO站群 · 红人营销 · 付费投放 · 联盟</text>
+      <rect x="355" y="40" width="250" height="78" rx="9" fill="#ecf5f0" stroke="#b9dcc9" stroke-width="1.3"/>
+      <text x="480" y="68" fill="#2e7d5b">② 产品域 Product</text>
+      <text x="480" y="90" font-weight="400" fill="#8b8f98" font-size="11.5">生成工作台 · 特效工坊 · 社区流 · 画布 · App</text>
+      <rect x="670" y="40" width="250" height="78" rx="9" fill="#f1ecfd" stroke="#d3c4f0" stroke-width="1.3"/>
+      <text x="795" y="68" fill="#6d4fd0">③ 模型域 Model Infra</text>
+      <text x="795" y="90" font-weight="400" fill="#8b8f98" font-size="11.5">20+模型接入路由 · 成本 · 质量评测（聚合模式独有）</text>
+      <!-- 下排 -->
+      <rect x="40"  y="150" width="250" height="78" rx="9" fill="#f9f3e6" stroke="#e0cfa4" stroke-width="1.3"/>
+      <text x="165" y="178" fill="#a8781f">④ 商业化 Monetization</text>
+      <text x="165" y="200" font-weight="400" fill="#8b8f98" font-size="11.5">定价套餐 · 积分经济学 · 支付 · 防薅</text>
+      <rect x="355" y="150" width="250" height="78" rx="9" fill="#f4f2ec" stroke="#d9d3c2" stroke-width="1.3"/>
+      <text x="480" y="178" fill="#5a5f66">⑤ 工程域 Platform</text>
+      <text x="480" y="200" font-weight="400" fill="#8b8f98" font-size="11.5">账号/任务队列 · 存储 · SRE · API开放平台</text>
+      <!-- 数据域居中 -->
+      <rect x="355" y="292" width="250" height="88" rx="10" fill="#21242b"/>
+      <text x="480" y="326" fill="#fff" font-size="14">⑥ 数据域 Data</text>
+      <text x="480" y="350" font-weight="400" fill="#b9bec8" font-size="11.5">语义层 · 数仓 · 看板 · AI 问答（本站所在）</text>
+    </g>
+    <g stroke="#b9b3a4" stroke-width="1.2" fill="none" marker-end="url(#ba)" stroke-dasharray="4 3">
+      <path d="M165,120 L390,290"/><path d="M480,120 L480,290"/><path d="M795,120 L570,290"/>
+      <path d="M165,230 L390,300"/><path d="M480,230 L480,290"/>
+    </g>
+    <text x="480" y="418" text-anchor="middle" font-size="11.5" fill="#8b8f98">数据域的服务对象: 增长看渠道ROI · 产品看漏斗留存 · 模型看毛利 · 商业化看积分健康 · 工程看成本</text>
+  </svg>
+  <div class="figcap">图 1 · 六个业务域与数据域的服务关系</div>
+  </div>
+
+  <h2 class="sec"><span class="no">02</span>团队构成与各域目标 <span class="badge-inf">推断</span></h2>
+  <p class="desc">百人级平台的公司画像：工程师约占四成，增长侧（SEO 内容/红人/投放）可能是最大的非技术团队——SEO 往往是此类产品的创始人本行。</p>
+  <table>
+    <tr><th>团队</th><th>规模推测</th><th>关心的目标（= 对数据的真实需求）</th></tr>
+    <tr><td>CEO / 创始人</td><td>—</td><td>ARR 增速、盈利、模型毛利、SEO 天花板 → 一张可信的"公司记分牌"</td></tr>
+    <tr><td>SEO / 内容</td><td>15-20</td><td>关键词排名、落地页×语言矩阵的转化 → 页面 ROI 口径</td></tr>
+    <tr><td>红人 / 投放</td><td>8-12</td><td>CAC、ROAS、归因（首触 vs 线性的裁判只能是数据团队）</td></tr>
+    <tr><td>产品 / 设计</td><td>15-20</td><td>激活（1d/7d 两派）、漏斗、功能渗透、留存 cohort</td></tr>
+    <tr><td>模型接入 / 评测</td><td>5-8</td><td>各模型成功率/时延/单秒成本 → 模型毛利与流量分配</td></tr>
+    <tr><td>商业化</td><td>3-5</td><td>付费转化、ARPPU、churn、积分池健康度</td></tr>
+    <tr><td><b>数据团队</b></td><td><b>3-4</b></td><td><b>服务以上全部 → 本站要回答的问题：一个人如何不被取数淹没</b></td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">03</span>公司北极星 <span class="badge-inf">推断</span></h2>
+  <p class="desc">北极星 = <b>周活跃创作者数</b>（有多少人在持续得到价值）。理由是计数器可以被少数重度用户
+  或赠送额度撑起来，而订阅制的续费信号是"人"——按人计量天然抗灌水，且增长、产品、模型三个域都能影响它。
+  次数与分钟数降为消耗口径。当前生效的北极星以
+  <code>metrics.yaml</code> 的 <code>north_star_status: approved</code> 为唯一事实源。
+  <a href="northstar.html">→ 看完整论证与推翻条件</a></p>
+  <div class="fig">
+  <svg viewBox="0 0 960 330" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,Microsoft YaHei,sans-serif">
+    <g stroke="#c9c3b4" stroke-width="1.2" fill="none">
+      <path d="M255,70 C330,70 330,55 405,55"/><path d="M255,70 C330,70 330,110 405,110"/>
+      <path d="M255,70 C330,70 330,165 405,165"/><path d="M255,70 C330,70 330,220 405,220"/><path d="M255,70 C330,70 330,275 405,275"/>
+    </g>
+    <rect x="30" y="42" width="225" height="56" rx="9" fill="#21242b"/>
+    <text x="142" y="66" fill="#fff" font-size="13.5" font-weight="600" text-anchor="middle">周活跃创作者数</text>
+    <text x="142" y="85" fill="#b9bec8" font-size="10.5" text-anchor="middle">Weekly Active Creators</text>
+    <g font-size="12" text-anchor="middle" font-weight="600">
+      <rect x="405" y="32" width="180" height="46" rx="8" fill="#eef1fb" stroke="#c4cdea" stroke-width="1.2"/><text x="495" y="58" fill="#32499c">访问量 × 注册率</text>
+      <rect x="405" y="87" width="180" height="46" rx="8" fill="#ecf5f0" stroke="#b9dcc9" stroke-width="1.2"/><text x="495" y="113" fill="#2e7d5b">激活率(TTFC)</text>
+      <rect x="405" y="142" width="180" height="46" rx="8" fill="#f1ecfd" stroke="#d3c4f0" stroke-width="1.2"/><text x="495" y="168" fill="#6d4fd0">人均创作 × 成功率</text>
+      <rect x="405" y="197" width="180" height="46" rx="8" fill="#f9f3e6" stroke="#e0cfa4" stroke-width="1.2"/><text x="495" y="223" fill="#a8781f">留存 × 召回</text>
+      <rect x="405" y="252" width="180" height="46" rx="8" fill="#f4f2ec" stroke="#d9d3c2" stroke-width="1.2"/><text x="495" y="278" fill="#5a5f66">变现效率(验证指标)</text>
+    </g>
+    <g font-size="11" fill="#8b8f98" text-anchor="middle">
+      <text x="700" y="58">← 增长域 owns（SEO/投放/红人）</text>
+      <text x="700" y="113">← 产品域 owns（引导流程）</text>
+      <text x="700" y="168">← 模型域 owns（质量/时延/额度）</text>
+      <text x="700" y="223">← 产品域 owns（价值循环）</text>
+      <text x="700" y="278">← 商业化 owns（积分→付费）</text>
+    </g>
+  </svg>
+  <div class="figcap">图 2 · 北极星拆解树 —— 每个分支恰好归属一个域，树即分工合同<br>
+  <span style="color:var(--bad)">注意：这棵树里 7 个叶子节点中，4 个口径可信、1 个当前口径失真、2 个尚无定义 —— 详见<a href="northstar.html">北极星审计</a></span></div>
+  </div>
+
+  <h2 class="sec"><span class="no">04</span>业务域 × 指标映射</h2>
+  <p class="desc">每个域"owns 北极星树的哪个分支"（分工），就"owns 哪组指标"（度量）。本节由 <code>metrics.yaml</code> 的 group 字段动态渲染——<b>指标归属也是语义层定义的一部分</b>，改 YAML 此图随之变。</p>
+  <div id="dmap" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0"></div>
+  <div class="figcap" style="margin-bottom:10px">六个域的分工与所辖指标（共 __METRIC_COUNT__ 个，由语义层目录渲染）</div>
+
+  <h4 style="font-size:14.5px;margin:18px 0 4px">跨域消费高频指标 <span style="font-weight:400;font-size:12px;color:var(--muted)">—— 联系不止于归属，更在"谁用它做什么决策"</span></h4>
+  <table>
+    <tr><th>指标</th><th>口径归属</th><th>主要消费方</th><th>支撑什么决策</th></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">active_creators</td><td>公司级</td><td>全员 / CEO 例会</td><td>北极星进度与归因（哪域拖了后腿）</td></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">weekly_successful_creations / weekly_minutes_generated</td><td>公司级 · 消耗</td><td>产品 / 模型域</td><td>规模与成本视角（消耗口径，不承担北极星）</td></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">model_gross_margin</td><td>模型域 × 数据共治</td><td>CEO / 模型域</td><td>模型流量分配、上下架、定价（模拟数据里 Veo 3.1 负毛利即此表暴露）</td></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">channel_revenue_first_touch / linear</td><td>归因</td><td>增长域 / 财务</td><td>预算在 SEO·红人·投放之间的分配</td></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">free_credit_burn_rate</td><td>商业化</td><td>商业化 / 产品</td><td>免费额度与套餐定价的调整</td></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">activation_1d / retention_d1</td><td>产品</td><td>产品 + 增长</td><td>增长看渠道质量，产品看引导效率——同一指标两类消费</td></tr>
+    <tr><td style="font-family:var(--mono);font-size:12px">effect_penetration</td><td>产品</td><td>产品 + 增长</td><td>特效"拉新-留存"平衡（病毒流量 vs 深度用户）</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">05</span>阶段诊断：为什么此刻是语义层</h2>
+  <div class="stage">
+    <div class="stg"><span class="sn">STAGE 1 · &lt;50 人</span><b>野蛮生长期</b><p>无专职数据，工程师手写 SQL 查生产库。烟囱式是<b>理性选择</b>：快、贴身、零前置投入。</p></div>
+    <div class="stg now"><span class="sn">STAGE 2 · 50-200 人</span><b>口径爆炸期（本画像所处）</b><p>多团队都要数：三个团队三个"付费用户"，会上数字打架；数据岗刚设立，需求开始排队。</p></div>
+    <div class="stg"><span class="sn">STAGE 3 · 200+ 人</span><b>平台化期</b><p>自助分析、语义层产品化、数据 BP。现在就建平台 = 过度设计。</p></div>
+  </div>
+  <div class="vsg">
+    <div class="vs good"><h4>烟囱式的优点（不该被简单否定）</h4><ul>
+      <li>需求到报表零协调成本，贴身服务</li><li>口径就是业务方自己定的，永远"对"</li><li>零前期投入，分析用完即弃、试错友好</li></ul></div>
+    <div class="vs bad"><h4>烟囱式在口径爆炸期的代价</h4><ul>
+      <li>口径分裂 → 信任崩塌从"数字打架"开始</li><li>同一张底层表被五个人各写一遍 SQL</li><li>人离职报表成黑盒，错了没人知道</li></ul></div>
+    <div class="vs good"><h4>统一数仓的价值</h4><ul>
+      <li>指标字典 = 全公司度量衡，口径唯一</li><li>加工一次全公司消费，边际成本递减</li><li>分层边界即质量检查点，血缘可追溯</li></ul></div>
+    <div class="vs bad"><h4>统一数仓的失效场景（高阶谈资）</h4><ul>
+      <li>中间层建设期业务等不起 → 被骂"慢"</li><li>需求排队 → 业务绕过平台导 Excel，shadow IT 复活</li><li>过度分层：一次性分析也走五层加工</li></ul></div>
+  </div>
+  <div class="card" style="border-color:var(--accent);background:var(--accent-wash)">
+    <h3 style="margin-bottom:4px">处方：轻量统一 <span style="font-weight:400;font-size:12.5px;color:var(--muted)">（由此推导出本站的形态）</span></h3>
+    <p style="color:var(--ink)">该统一的统一：<b>指标口径、核心链路（收入/成本/漏斗）、埋点规范</b>；该放权的放权：探索性分析、一次性报表。
+    3-4 人数据团队的第一步不是搭平台，而是把口径变成机器可执行的单一事实源——<b>于是有了 metrics.yaml，有了这个站</b>。</p>
+    <p style="margin-top:8px"><a href="layer.html">→ 看这 __METRIC_COUNT__ 个指标如何被定义（语义层目录）</a>　<a href="ai.html">→ 看它们如何被 AI 消费</a></p>
+  </div>
+
+  <footer>
+    <span>MetricHub · 本页为公开信息推断画像，与后续页面构成"推断 → 架构 → 实现"的完整链路</span>
+    <span><a href="layer.html">下一页：语义层 →</a></span>
+  </footer>
+</main>
+
+<script>
+const DOMAIN_META = {
+  north_star:{cls:'k', name:'公司级 · 北极星', duty:'owns 价值交付总量 —— 全员共担, 域例会的锚点'},
+  growth:    {cls:'g', name:'增长域',          duty:'owns 流量端: 访问 × 注册 × 渠道效率'},
+  product:   {cls:'p', name:'产品域',          duty:'owns 激活与留存: 引导流程 × 价值循环'},
+  model:     {cls:'m', name:'模型域',          duty:'owns 人均创作 × 成功率: 质量/时延/成本'},
+  monetization:{cls:'o', name:'商业化域',      duty:'owns 变现效率: 积分 → 付费 → ARPPU'},
+  attribution:{cls:'a', name:'归因（增长×数据共治）', duty:'渠道功劳的裁判: 首触看质量, 线性看助攻'},
+};
+fetch('api/catalog.json').then(r=>r.json()).then(list=>{
+  const box=document.getElementById('dmap');
+  for(const [g,meta] of Object.entries(DOMAIN_META)){
+    const ms=list.filter(m=>m.group===g);
+    if(!ms.length) continue;
+    const d=document.createElement('div'); d.className='dcard '+meta.cls;
+    d.innerHTML=`<div class="dhead"><span class="dname">${meta.name}</span>
+        <span class="dcount">${ms.length} 个指标</span></div>
+      <div class="dduty">${meta.duty}</div>`+
+      ms.map(m=>`<a class="dchip" href="layer.html#m-${m.name}" title="${m.title}: ${m.desc}">
+        <code>${m.name}</code> · ${m.title}</a>`).join('');
+    box.appendChild(d);
+  }
+});
+</script>
+</body>
+</html>

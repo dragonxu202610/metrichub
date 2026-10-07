@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>北极星审计 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .verdict{background:#21242b;color:#e8e6e0;border-radius:12px;padding:22px 26px;margin:16px 0}
+  .verdict h3{color:#fff;font-family:var(--serif);font-size:19px;margin-bottom:8px}
+  .verdict p{color:#b9bec8;font-size:13.5px;line-height:1.8}
+  .verdict b{color:#fff}
+  .verdict .hl{color:#f0c674}
+  .fig{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 10px;margin:14px 0;overflow-x:auto}
+  .fig svg{display:block;margin:0 auto;min-width:1100px}
+  .figcap{text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
+  .cov{display:inline-block;font-size:10.5px;font-weight:700;border-radius:4px;padding:0 6px;letter-spacing:.5px}
+  .cov.yes{background:var(--good-wash);color:var(--good);border:1px solid #bfdccd}
+  .cov.deg{background:var(--amber-wash);color:var(--amber);border:1px solid #e0cfa4}
+  .cov.no{background:var(--bad-wash);color:var(--bad);border:1px solid #eed0d5}
+  .ev{border-left:3px solid var(--line);padding:2px 0 2px 14px;margin:10px 0;font-size:13px;color:#3d4350}
+  .ev code{font-size:12px}
+  .ev .src{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .killer{background:var(--bad-wash);border:1px solid #eed0d5;border-radius:10px;padding:14px 18px;margin:12px 0}
+  .killer b{color:var(--bad)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+  @media(max-width:840px){.grid2{grid-template-columns:1fr}}
+  .vsc{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:16px 20px}
+  .vsc h4{font-size:14.5px;margin-bottom:6px}
+  .vsc ul{list-style:none}
+  .vsc li{font-size:12.8px;color:var(--muted);padding:2px 0 2px 16px;position:relative}
+  .vsc li:before{content:"";position:absolute;left:2px;top:11px;width:5px;height:5px;border-radius:50%;background:var(--line)}
+  .vsc.pro{border-color:#bfdccd} .vsc.pro li:before{background:var(--good)}
+  .vsc.con{border-color:#eed0d5} .vsc.con li:before{background:var(--bad)}
+  .pick{border:2px solid var(--accent);background:var(--accent-wash)}
+  .pick h4:after{content:"推荐";font-size:11px;background:var(--accent);color:#fff;border-radius:4px;
+                 padding:1px 7px;margin-left:8px;vertical-align:2px;font-family:var(--sans)}
+  .falsify{border:1px dashed var(--accent);border-radius:10px;padding:16px 20px;margin:14px 0;background:#fbfbfe}
+  .falsify h4{font-size:14.5px;color:var(--accent-deep);margin-bottom:6px}
+  .falsify table{font-size:13px}
+  table.mx td:first-child{font-family:var(--mono);font-size:12px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item" href="index.html">总览</a>
+  <a class="item" href="business.html">业务解构</a>
+  <a class="item on" href="northstar.html">北极星审计</a>
+  <a class="item" href="dashboard.html">看板</a>
+  <a class="item" href="layer.html">语义层</a>
+  <a class="item" href="ai.html">AI 问答</a>
+  <span class="right">对本站自身口径的审计</span>
+</div></nav>
+<main>
+  <div class="hero" style="padding-bottom:0">
+    <div class="eyebrow">AUDIT THE METRIC BEFORE YOU SHIP THE BOARD</div>
+    <h1 style="font-size:28px">北极星审计</h1>
+    <p class="lead" style="font-size:14.5px">北极星选错，整张看板会朝错误的方向优化。这一页用四个问题把它钉死：
+    <b>为什么是「人」而不是「次数」</b>、口径语义是否自洽、拆解树每个分支是否真的可度量、
+    以及<b>什么条件下必须推翻它</b>。</p>
+  </div>
+
+  <div class="verdict">
+    <h3>结论：北极星 = 周活跃创作者数（人）</h3>
+    <p>次数与分钟数都是<b>产出计数器</b>：一次 2 秒生成与一次 12 秒生成同样记 1，而成本侧按秒计费，
+    <span class="hl">计量单位与成本单位不同构</span>。更根本的是，计数器能被少数重度用户与赠送额度撑起来，
+    掩盖"有多少人在持续创作"这个真正决定续费的信号。用「人」计量天然抗灌水，
+    且增长、产品、模型三个域都能影响它。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">01</span>三个候选为什么这么排</h2>
+  <p class="desc">四条标准：①代表用户获得的价值 ②与收入同向 ③全员可影响 ④不易被虚荣化。</p>
+  <div class="grid2">
+    <div class="vsc pro pick">
+      <h4>周活跃创作者数（人）</h4>
+      <ul>
+        <li>按"人"计量天然抗灌水：送积分能让次数暴涨，换不来更多<b>持续创作的人</b></li>
+        <li>三个域都能影响：增长拉来对的人、产品降低首次成功门槛、模型提高成功率让人愿意再来</li>
+        <li>弱点：不反映创作深度（一人一条也算一个创作者）→ 必须配 <code>creations_per_active_user</code></li>
+      </ul>
+    </div>
+    <div class="vsc con">
+      <h4>周生成分钟数（量）</h4>
+      <ul>
+        <li>与成本侧按秒计费同构，长视频权重大，能反映"用了多少"</li>
+        <li>但方向可能错：用户从"生成 20 个 10 秒废片"变成"精修 1 个 60 秒成片"时，
+            分钟数下降而用户价值上升</li>
+        <li>定位：<b>消耗/供给侧</b>的核心指标，不做公司北极星</li>
+      </ul>
+    </div>
+  </div>
+  <div class="vsc con" style="margin-top:0">
+    <h4>周成功创作数（次）</h4>
+    <ul>
+      <li>把"次数"当北极星，等于宣布"多生成"就是目标 —— 而质量最差的批量生成最容易把数字做大</li>
+      <li>一次 2 秒与一次 12 秒记 1，与按秒计费的成本结构不同构，无法回答"这些产出值不值"</li>
+      <li>定位：<b>消耗口径</b>，与分钟数并列，不进北极星</li>
+    </ul>
+  </div>
+
+  <h2 class="sec"><span class="no">02</span>口径语义：粒度必须写进定义</h2>
+  <p class="desc">指标名只声明"窗口"是不够的 —— 同一个名字可以合法地给出三种量级，而没有任何一方算错。</p>
+  <div class="ev">
+    <code>weekly_successful_creations</code> 的 <code>desc</code> 是「近 7 个自然日成功完成的视频生成任务总数」，
+    即<b>窗口内求和</b>，不是逐日滚动值。于是同一个指标名在三个消费端给出三种东西：
+    KPI 返回 <code>13,542</code>（7 日累计）、趋势图返回 <code>172 → 2,469</code>（每日值）、
+    维度分解返回 <code>18,660</code>（14 日累计）。
+    <span class="src">证据：<code>metrics.yaml</code> 定义 · <code>out/api/dashboard.json</code> · <code>out/api/metric_weekly_successful_creations.json</code></span>
+  </div>
+  <div class="tip-inf">
+    <b>做法：把粒度也变成口径。</b><code>grain</code>（<code>window</code>=窗口内单值 / <code>daily</code>=逐日值）
+    与 <code>additivity</code>（可加/不可加）都写进 <code>metrics.yaml</code>，
+    <code>compile()</code> 与 <code>query_metric</code> 强制消费端显式声明 <code>granularity</code>。
+    比率类（30% + 40% = 70% 显然错）与去重类（DAU 求和无意义）因此不可能被下游误求和 ——
+    歧义在编译层被关掉，而不是靠约定。
+  </div>
+
+  <h2 class="sec"><span class="no">03</span>拆解树的每个分支都必须可度量</h2>
+  <p class="desc">把树的叶子节点逐个到 <code>metrics.yaml</code> 里找定义。
+  <span class="cov yes">可用</span> 能直接取数 ·
+  <span class="cov deg">失真</span> 有定义但当前口径产出的数字不可信 ·
+  <span class="cov no">缺失</span> 语义层里根本没有这个度量。</p>
+  <div class="fig">
+  <svg viewBox="0 0 1060 430" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,Microsoft YaHei,sans-serif">
+    <g stroke="#c9c3b4" stroke-width="1.2" fill="none">
+      <path d="M230,93 C310,93 300,34 385,34"/>
+      <path d="M230,93 C310,93 300,90 385,90"/>
+      <path d="M230,93 C310,93 300,146 385,146"/>
+      <path d="M230,93 C310,93 300,202 385,202"/>
+      <path d="M230,93 C310,93 300,258 385,258"/>
+      <path d="M230,93 C310,93 300,314 385,314"/>
+      <path d="M230,93 C310,93 300,370 385,370"/>
+    </g>
+    <rect x="18" y="63" width="212" height="60" rx="9" fill="#21242b"/>
+    <text x="124" y="88" fill="#fff" font-size="13.5" font-weight="600" text-anchor="middle">周活跃创作者数</text>
+    <text x="124" y="107" fill="#b9bec8" font-size="10.5" text-anchor="middle">Weekly Active Creators</text>
+
+    <g font-size="12.5" text-anchor="middle" font-weight="600">
+      <rect x="385" y="12" width="200" height="44" rx="8" fill="#eef1fb" stroke="#c4cdea" stroke-width="1.2"/>
+      <text x="485" y="39" fill="#32499c">访问量（会话）</text>
+      <rect x="385" y="68" width="200" height="44" rx="8" fill="#ecf5f0" stroke="#b9dcc9" stroke-width="1.2"/>
+      <text x="485" y="95" fill="#2e7d5b">注册率</text>
+      <rect x="385" y="124" width="200" height="44" rx="8" fill="#ecf5f0" stroke="#b9dcc9" stroke-width="1.2"/>
+      <text x="485" y="151" fill="#2e7d5b">激活率（TTFC）</text>
+      <rect x="385" y="180" width="200" height="44" rx="8" fill="#ecf5f0" stroke="#b9dcc9" stroke-width="1.2"/>
+      <text x="485" y="207" fill="#2e7d5b">人均创作</text>
+      <rect x="385" y="236" width="200" height="44" rx="8" fill="#f9f3e6" stroke="#e0cfa4" stroke-width="1.2"/>
+      <text x="485" y="263" fill="#a8781f">成功率</text>
+      <rect x="385" y="292" width="200" height="44" rx="8" fill="#ecf5f0" stroke="#b9dcc9" stroke-width="1.2"/>
+      <text x="485" y="319" fill="#2e7d5b">留存</text>
+      <rect x="385" y="348" width="200" height="44" rx="8" fill="#faeef0" stroke="#eed0d5" stroke-width="1.2"/>
+      <text x="485" y="375" fill="#c25462">沉默召回</text>
+    </g>
+    <g font-size="11.5">
+      <rect x="620" y="18" width="76" height="22" rx="4" fill="#faeef0" stroke="#eed0d5"/><text x="658" y="33" fill="#c25462" text-anchor="middle" font-weight="700">缺失</text>
+      <text x="708" y="33" fill="#8b8f98">没有"会话/访客"这一层，漏斗第一跳是空的</text>
+      <rect x="620" y="74" width="76" height="22" rx="4" fill="#ecf5f0" stroke="#bfdccd"/><text x="658" y="89" fill="#2e7d5b" text-anchor="middle" font-weight="700">可用</text>
+      <text x="708" y="89" fill="#8b8f98">new_users ÷ 访问量（分母缺失，只能算半步）</text>
+      <rect x="620" y="130" width="76" height="22" rx="4" fill="#ecf5f0" stroke="#bfdccd"/><text x="658" y="145" fill="#2e7d5b" text-anchor="middle" font-weight="700">可用</text>
+      <text x="708" y="145" fill="#8b8f98">ttfc_median 用带分钟精度的时间戳，注册 → 首次成功生成</text>
+      <rect x="620" y="186" width="76" height="22" rx="4" fill="#ecf5f0" stroke="#bfdccd"/><text x="658" y="201" fill="#2e7d5b" text-anchor="middle" font-weight="700">可用</text>
+      <text x="708" y="201" fill="#8b8f98">creations_per_active_user（人数与次数配对）</text>
+      <rect x="620" y="242" width="76" height="22" rx="4" fill="#f9f3e6" stroke="#e0cfa4"/><text x="658" y="257" fill="#a8781f" text-anchor="middle" font-weight="700">失真</text>
+      <text x="708" y="257" fill="#8b8f98">model_success_rate 与北极星口径重复计数，不能单独当分支指标</text>
+      <rect x="620" y="298" width="76" height="22" rx="4" fill="#ecf5f0" stroke="#bfdccd"/><text x="658" y="313" fill="#2e7d5b" text-anchor="middle" font-weight="700">可用</text>
+      <text x="708" y="313" fill="#8b8f98">retention_d1 只认注册次日当天（末日队列未成熟时出参 null）</text>
+      <rect x="620" y="354" width="76" height="22" rx="4" fill="#faeef0" stroke="#eed0d5"/><text x="658" y="369" fill="#c25462" text-anchor="middle" font-weight="700">缺失</text>
+      <text x="708" y="369" fill="#8b8f98">召回/重新激活没有任何定义</text>
+    </g>
+  </svg>
+  <div class="figcap">图 1 · 北极星拆解树 × 语义层覆盖率 —— 7 个叶子节点：<b>4 个口径可信</b> / 1 个失真 / 2 个缺失</div>
+  </div>
+
+  <div class="killer">
+    <b>增长域必须能影响北极星，否则树上的"分工合同"是画出来的。</b>
+    <code>dwd_task</code> 只有 <code>model</code> / <code>platform</code> 两维，连不到渠道 ——
+    树说「增长域 owns 访问量 × 注册率」，但这条分支在数据上接不到北极星。
+    做法：新增 <code>dwd_task_ch</code>（任务表 join 用户表），把获取渠道与国别挂到任务上 ——
+    北极星因此有了 <code>[channel, country, platform]</code> 维度，消耗口径也接上了 <code>channel</code>。
+    <b>不需要新埋点</b>，因为 <code>dwd_user</code> 里本来就有 channel。
+  </div>
+  <p class="desc">剩余两个缺口 —— <b>会话/访客数</b>与<b>沉默召回</b> —— 都在采集层，
+  不是加一条 YAML 能解决的：漏斗第一跳没有数据，指标就撑不住北极星。
+  这说明"指标撑不住战略"的根因往往在采集，而不在语义层。</p>
+
+  <h2 class="sec"><span class="no">04</span>三条可复现的反驳</h2>
+  <p class="desc">以下三条都能在 <code>out/api/*.json</code> 上复算。样本是模拟器生成的 14 天数据，
+  因此它们的证据强度是<b>机制推演 / 可复现</b>，不是对公司真实经营关系的实证 ——
+  凡涉及公司级结论的段落，都必须用真实数据重新验证后再引用。</p>
+
+  <div class="ev">
+    <b>① 「与收入线性相关」不成立，只能说到"同向"。</b>
+    相邻两日对比：10-07→10-08 创作数 +8.1% 而收入 +84.3%，<b>弹性 10.4</b>；
+    另一组相邻日（10-02→10-03，+15.9% vs +32.9%）弹性约 <b>2.06</b> —— 同样是"同向"，弹性差约 5 倍。
+    两者之间隔着积分定价、套餐结构、退款与模型成本，不是线性关系。
+    <span class="src">证据：<code>out/api/dashboard.json</code> 的 creations 与 revenue 序列（2026-09-25 ~ 10-08）</span>
+  </div>
+
+  <div class="ev">
+    <b>② 计数口径会抹平时长差异。</b>
+    10-08 单日：创作数 2,469 次、视频 287.2 分钟 → 平均产出 7.0 秒/次，
+    而单任务时长是 <code>rng.randint(2, 12)</code>（均值 7.0）。
+    <b>"平均 7 秒/次"就是模拟器参数的算术结果</b> —— 它演示的是"计数口径抹平时长差异"这个机制。
+    <span class="src">证据：<code>out/api/dashboard.json</code> · <code>simulator.py</code> 的 <code>secs = rng.randint(2, 12)</code></span>
+  </div>
+
+  <div class="ev">
+    <b>③ 计数上升可以与毛利下降同时发生。</b>
+    Veo 3.1 在数据里成功率最高（96.7%）、创作数占比约 5.4%、毛利率 −125.6%：
+    收入按**当期实收现金**分摊到模型、成本按秒 × 厂商单价计，且扣费被 <code>min(balance, secs)</code> 封顶
+    → 负毛利在数学上必然出现。<b>把 <code>.048</code> 改成 <code>.02</code> 重跑，该模型立刻转正、这段论证失效。</b>
+    它证明的是"聚合模式的成本结构会让高端模型亏钱"这一机制，不是"某个模型在亏钱"。
+    <span class="src">证据：<code>simulator.py</code> 的模型常数 · <code>build.py</code> 的 <code>sum(credits) × 0.04</code></span>
+  </div>
+
+  <h2 class="sec"><span class="no">05</span>配套指标：防止北极星被做坏</h2>
+  <p class="desc">北极星只有一个。配对与护栏的作用不是并列，而是防止它被优化坏。</p>
+  <div class="grid2">
+    <div class="vsc"><h4>配对 · 创作深度</h4>
+      <ul><li><code>creations_per_active_user</code> —— 防止"人多但都只来一次"</li></ul></div>
+    <div class="vsc"><h4>消耗 · 用量与成本</h4>
+      <ul><li><code>weekly_minutes_generated</code>（周） / <code>minutes_generated</code>（日）</li></ul></div>
+    <div class="vsc"><h4>护栏 · 续费</h4>
+      <ul><li><code>payer_retention_wow</code> —— 订阅制最直接的续费代理</li></ul></div>
+    <div class="vsc"><h4>护栏 · 毛利与成本结构</h4>
+      <ul><li><code>company_gross_margin</code> / <code>high_cost_exposure</code> / <code>balance_capped_revenue_gap</code></li></ul></div>
+  </div>
+
+  <h3 style="font-size:15px;margin:20px 0 6px">拆解恒等式：每一项都对应一个可度量的定义</h3>
+  <table class="mx">
+    <tr><th>分支</th><th>恒等式</th><th>需要的指标</th><th>现状</th></tr>
+    <tr><td>新增侧</td><td>新用户创作 = 新增注册 × 激活率 × 新用户人均创作</td>
+        <td><code>new_users</code> / <code>activation_7d</code> / <b>新用户人均创作</b></td>
+        <td><span class="cov yes">2 有</span> <span class="cov no">1 缺</span></td></tr>
+    <tr><td>存量侧</td><td>存量创作 = 活跃创作者 × 留存率 × 人均创作</td>
+        <td><code>active_creators</code> / <code>retention_d1</code> / <code>creations_per_active_user</code></td>
+        <td><span class="cov yes">3 有</span></td></tr>
+    <tr><td>召回侧</td><td>召回创作 = 沉默用户召回数 × 召回后人均创作</td>
+        <td><b>沉默召回率</b> / <b>召回后人均创作</b></td>
+        <td><span class="cov no">2 缺</span></td></tr>
+    <tr><td>质量侧</td><td>成功分钟数 = 尝试分钟数 × 成功率</td>
+        <td><code>model_success_rate</code> + <b>尝试分钟数</b></td>
+        <td><span class="cov yes">1 有</span> <span class="cov no">1 缺</span></td></tr>
+    <tr><td>流量侧</td><td>访问量 × 注册率</td>
+        <td><b>会话/访客数</b> + <code>new_users</code> / <code>first_day_creations</code></td>
+        <td><span class="cov no">1 缺</span> <span class="cov yes">2 有</span></td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">06</span>什么条件下必须推翻它</h2>
+  <p class="desc">一个北极星结论如果无法被证伪，它就只是偏好。<b>判据已预注册在 <code>northstar_eval.py</code> 里</b>
+  —— 先写规则、再看结果，运行后落盘 <code>out/api/northstar_evidence.json</code>，本页不手写任何数字。
+  下面每条推翻条件都标了三态：<b>现在可执行</b> / <b>需新增定义</b> / <b>需补埋点</b>，
+  不把"可执行的"降级成"需埋点的"，也不把"需埋点的"伪装成可执行。</p>
+  <div class="falsify">
+    <table>
+      <tr><th>检验</th><th>观察窗口</th><th>状态</th><th>推翻条件（判据落在 northstar_eval.py）</th></tr>
+      <tr><td>人 vs 产出：谁更贴钱</td><td>连续 2 个季度</td>
+          <td><span class="cov yes">现在可执行</span></td>
+          <td>若 <code>active_creators</code> 与收入的相关系数 <b>低于</b>创作数/分钟数，触发改判（R1）
+              ——这是本项目唯一一条"能推翻北极星本身"的可执行检验</td></tr>
+      <tr><td>创作者是否只被"一次性尝鲜"撑起</td><td>每月</td>
+          <td><span class="cov yes">现在可执行</span></td>
+          <td>若 <code>active_creators</code> 上升而 <code>creations_per_active_user</code> 连续 3 个月下降，
+              说明北极星在被尝鲜撑起</td></tr>
+      <tr><td>是否需要换消耗口径的单位</td><td>连续 2 个季度</td>
+          <td><span class="cov yes">现在可执行</span></td>
+          <td>若分钟数与收入的相关性比创作数高 0.1 以上，说明价值密度重要，消耗口径主指标换成分钟（R3）</td></tr>
+      <tr><td>毛利是否被北极星牺牲</td><td>每季度</td>
+          <td><span class="cov yes">现在可执行</span></td>
+          <td>Δ<code>company_gross_margin</code> &lt; −3pp 且 Δ<code>weekly_minutes_generated</code> &lt; +10% →
+              说明北极星在引导亏本增长，必须引入毛利约束</td></tr>
+      <tr><td>免费额度是否在灌水</td><td>每月</td>
+          <td><span class="cov deg">部分可执行</span></td>
+          <td><code>free_credit_burn_rate</code> 已可读（分母只算免费发放，&lt;55% 告警；
+              付费附赠另由 <code>paid_credit_burn_rate</code> 单列）；缺"免费用户付费转化率"——
+              它才回答"送的额度有没有换成钱"，目前没有定义</td></tr>
+      <tr><td>深度创作者占比</td><td>每月</td>
+          <td><span class="cov deg">需新增定义</span></td>
+          <td>需要"每周创作 ≥2 次的创作者数"——一行 YAML 即可</td></tr>
+      <tr><td>创作是否真的被消费</td><td>每季度</td>
+          <td><span class="cov no">需补埋点</span></td>
+          <td>需要 save/share 事件的埋点（当前 <code>event_type</code> 恒为 <code>view</code>），
+              字段与触发时机已在 <code>PLAN-90D.md</code> 的埋点需求单里</td></tr>
+    </table>
+  </div>
+
+  <div class="card" style="border-color:var(--accent);background:var(--accent-wash);margin:14px 0">
+    <h3 style="margin-bottom:6px">检验结果：三个候选在演示数据上<b>不可区分</b></h3>
+    <table style="margin:8px 0">
+      <tr><th>候选</th><th class="r">与收入的相关系数</th><th class="r">弹性</th><th class="r">末值</th></tr>
+      <tr><td>周活跃创作者数（人）</td><td class="r">0.997</td><td class="r">1.71</td><td class="r">4,278</td></tr>
+      <tr><td>周成功创作数（次）</td><td class="r">0.997</td><td class="r">1.51</td><td class="r">13,542</td></tr>
+      <tr><td>周生成分钟数（分钟）</td><td class="r">0.997</td><td class="r">1.52</td><td class="r">1,576</td></tr>
+    </table>
+    <p style="color:var(--ink)">三者相关系数完全相同（差值 &lt; 0.01），<b>14 天的模拟数据无法分辨谁更贴钱</b>。
+    因此 R1 判据输出的是 <b>「不可区分」</b>——既不改判，也不给"人"背书。
+    选「人」的理由是机制层面的（计数器可被重度用户与赠送额度撑起、人的口径抗灌水），
+    不是"数据证明人更贴钱"。真实环境下需 ≥2 个季度数据重跑本脚本再定论。</p>
+    <p style="margin-top:6px"><span class="src">产物：<code>out/api/northstar_evidence.json</code>（判据写在
+    <code>northstar_eval.py</code> 的 <code>DECISION_RULES</code> 里，先于结果存在）</span></p>
+  </div>
+
+  <h2 class="sec"><span class="no">07</span>交付与验证</h2>
+  <p class="desc">口径写完不算交付：<b>每一次构建都要过七道门禁，退出码非 0 就不发布</b>。
+  每道门挡住的是一类具体错误 ——</p>
+  <table>
+    <tr><th>门禁</th><th>挡住的错误</th></tr>
+    <tr><td><code>build.py --fresh</code></td>
+        <td>产物与源不同步：改了口径但线上还是旧数字</td></tr>
+    <tr><td><code>check.py --data</code></td>
+        <td>口径契约字段缺失、前端 × 产物契约、跨文件一致性；数据侧的分母为 0、时间序列为空、队列未成熟导致的假信号</td></tr>
+    <tr><td><code>evidence.py</code></td>
+        <td>页面引用的数字无法从产物复算（引用型论断必须绑定到具体日期对，偏差 &gt; 5% 直接失败）</td></tr>
+    <tr><td><code>northstar_eval.py</code></td>
+        <td>判据事后编写：判据先于结果存在，结论落盘 <code>northstar_evidence.json</code></td></tr>
+    <tr><td><code>js_syntax_probe.py</code></td>
+        <td>模板字面量 / 括号 / script 配对错误导致的白屏</td></tr>
+    <tr><td><code>compare_out.py</code></td>
+        <td>改了 <code>site/</code> 却没重跑 <code>build.py</code>，线上是旧页面</td></tr>
+    <tr><td><code>verify_served.py</code></td>
+        <td>发布页面里关键事实与北极星标注没有真的渲染出来</td></tr>
+  </table>
+  <div class="card" style="border:1px solid var(--line);margin-top:14px">
+    <p><b>七道门禁全绿。</b>"自检脚本写了"和"自检脚本跑过"是两件事 ——
+    交付的是一张看板加一份"这张看板哪里不可信、以及怎么验证"的说明书。</p>
+    <p style="margin-top:6px">本页与「语义层」页是一对：那一页展示口径如何被机器执行，这一页展示口径如何被质疑。
+    <code>metrics.yaml</code> 里的 <code>notes</code>（争议记录）是本页的最小版本，本页是它的完整版本。</p>
+    <p style="margin-top:8px"><a href="business.html">← 回看业务解构</a>　<a href="layer.html">→ 看这些指标如何被定义</a></p>
+  </div>
+
+  <footer>
+    <span>MetricHub · 本页所有数字均可由 <code>out/api/*.json</code> 与 <code>metrics.yaml</code> 复核</span>
+    <span><a href="index.html">↩ 回到总览</a></span>
+  </footer>
+</main>
+</body>
+</html>

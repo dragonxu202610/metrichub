@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 问答 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item" href="index.html">总览</a>
+  <a class="item" href="business.html">业务解构</a>
+  <a class="item" href="northstar.html">北极星审计</a>
+  <a class="item" href="dashboard.html">看板</a>
+  <a class="item" href="layer.html">语义层</a>
+  <a class="item on" href="ai.html">AI 问答</a>
+  <span class="right">L1 上下文注入 + L2 工具调用</span>
+</div></nav>
+<main>
+  <div class="hero" style="padding-bottom:0">
+    <h1 style="font-size:26px">当 AI 遇到指标</h1>
+    <p class="lead" style="font-size:14px">AI 编程工具让"写 SQL"的成本归零，反而放大了语义事故：<b>语法正确但口径错误</b>的查询如今秒出、秒执行、秒扩散。
+    所以语义层的优先级被 AI 提高了，不是降低了。下面是五个真实问题的完整链路——每一步都是可追溯的。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">01</span>三层递进</h2>
+  <div class="lvl">
+    <div class="l now"><b>L1 · 上下文注入</b><small>把指标定义注入 prompt——消灭同义词歧义、隐式默认、时间语义三类失败根因。AI 读的是口径，不是猜。</small></div>
+    <div class="l now"><b>L2 · 工具化调用</b><small>AI 不生成 SQL，调用 <code>query_metric()</code>——SQL 由语义层编译，口径错误在架构上不可能发生。对应 Cube MCP 的 leading pattern。</small></div>
+    <div class="l"><b>L3 · 口径自动治理</b><small>（路线图）AI 起草新指标 YAML → 校验 → 人审 → 注册。语义层从被消费升级为被维护。</small></div>
+  </div>
+
+  <h2 class="sec"><span class="no">02</span>五个问题的完整链路</h2>
+  <p class="desc">每张卡片：注入的上下文（L1）→ 工具调用（L2）→ 语义层编译的 SQL → 结果 → 以及"裸 text-to-SQL 会错在哪"。</p>
+  <div class="tip-inf" style="border-left-color:var(--amber);background:var(--amber-wash)">
+    <b>这不是一次现场 LLM 推理</b>：以下五条链路由 <code>build.py</code> 在构建时预计算并落成 JSON 快照
+    （<code>api/ai_demo.json</code>），用于演示<b>架构与口径流转</b>，页面上不会发生模型调用。
+    真实接入形态是：同一份 <code>ai_context()</code> 注入 prompt → 模型返回 <code>query_metric</code> 工具调用 →
+    语义层 <code>query()</code> 执行 → 结果回填。两者共用同一段编译逻辑，差别只在"谁来选指标和维度"。
+  </div>
+  <div id="qas"></div>
+
+  <div class="card" style="margin-top:26px">
+    <h3>诚实边界</h3>
+    <p>语义层是必要条件而非充分条件——指标覆盖不全时 AI 仍会退回裸 SQL，复杂探索仍需人；语义层自身也需要治理（谁批准新指标？口径变更谁签字？）。本演示的五问均为预计算的真实链路（build.py 执行），非 LLM 现场生成——演示的是<b>架构</b>，不是模型能力。</p>
+  </div>
+
+  <footer>
+    <span>MetricHub · 生产对应物：Cube(语义层+MCP server) / dbt MetricFlow(AI agent 消费)</span>
+    <span><a href="index.html">↩ 回到总览</a></span>
+  </footer>
+</main>
+<script>
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+fetch('api/ai_demo.json').then(r=>r.json()).then(qas=>{
+  const box=document.getElementById('qas');
+  qas.forEach((qa,i)=>{
+    const el=document.createElement('div');el.className='qa';
+    const rows=qa.rows.map(r=>{
+      const dims=qa.dims.map(d=>`<td>${esc(r[d])}</td>`).join('');
+      return `<tr>${dims}<td class="r num"><b>${(+r.value).toLocaleString()}</b></td></tr>`;
+    }).join('');
+    el.innerHTML=`
+      <div class="qhead">
+        <span class="qi">${i+1}</span>
+        <span class="qtext">"${esc(qa.q)}"<small>query_metric · ${qa.metric}</small></span>
+      </div>
+      <div class="qbody"><div class="steps">
+        <div class="step"><div class="tagcol"><span class="tag l1">L1 注入</span></div>
+          <div class="content"><div class="note">AI prompt 中注入的指标定义（来自 metrics.yaml，非模型记忆）：</div>
+          <pre>${esc(qa.context)}</pre></div></div>
+        <div class="step"><div class="tagcol"><span class="tag l2">L2 工具</span></div>
+          <div class="content"><div class="note">AI 不写 SQL，发起工具调用：</div>
+          <pre>${esc(JSON.stringify(qa.tool_call, null, 2))}</pre></div></div>
+        <div class="step"><div class="tagcol"><span class="tag sql">编译</span></div>
+          <div class="content"><div class="note">语义层由 YAML 编译出的 SQL（口径、时间窗、分组全部来自定义）：</div>
+          <pre>${esc(qa.sql)}</pre></div></div>
+        <div class="step"><div class="tagcol"><span class="tag sql">结果</span></div>
+          <div class="content"><table class="restable">
+            <thead><tr>${qa.dims.map(d=>`<th>${d}</th>`).join('')}<th class="r">value</th></tr></thead>
+            <tbody>${rows}</tbody></table></div></div>
+        <div class="step"><div class="tagcol"><span class="tag risk">对照</span></div>
+          <div class="content"><div class="note">${esc(qa.bare_sql_risk)}。<b>语义层把这五类失败在架构层关闭。</b></div></div></div>
+      </div></div>`;
+    el.querySelector('.qhead').addEventListener('click',()=>el.classList.toggle('open'));
+    box.appendChild(el);
+  });
+});
+</script>
+</body>
+</html>
