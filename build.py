@@ -22,6 +22,7 @@ import duckdb
 
 import simulator
 from semantic import SemanticLayer
+from streaming.replay import replay as stream_replay
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "out"
@@ -209,6 +210,11 @@ def main():
     # 1) 指标目录(语义层页渲染用) —— 含 grain 语义(窗口内单值 / 逐日值), 消费端据此解释数字
     write_json(OUT / "api" / "catalog.json", sl.catalog())
 
+    # 1.5) 流批对账(流式最小样例, 演示级): 三口径同一份重放数据, 守恒断言在 replay() 内部。
+    #      页面 headline 数字以占位符渲染进 realtime.html, 与产物同源不漂移。
+    stream_cmp = stream_replay()
+    write_json(OUT / "api" / "stream_compare.json", stream_cmp)
+
     # 2) 每指标: 序列 + 各维度分解(语义层页"试一试"控制台的数据源)
     #    粒度规则(修掉的口径缺陷): grain=daily 的指标序列 = 逐日值;
     #    grain=window 且 sequence 需要日期的指标 = 按日重算窗口值(滚动), 例如"周成功创作数"
@@ -327,7 +333,11 @@ def main():
     #    避免"加了指标忘了改文案"这类漂移(此前 20 这个数字硬编码在 3 个页面里).
     shutil.copytree(ROOT / "site", OUT, dirs_exist_ok=True)
     run_dbt_docs()
-    tokens = {"__METRIC_COUNT__": str(len(sl.metrics))}
+    ss = stream_cmp["stats"]
+    tokens = {"__METRIC_COUNT__": str(len(sl.metrics)),
+              "__STREAM_BATCH__": f"{ss['batch_total']:,}",
+              "__STREAM_DROPPED__": str(ss["wm_dropped"]),
+              "__STREAM_MISPLACED__": str(ss["misplaced"])}
     # 占位符渲染范围: 交付目录的 html + 仓库级 README(README 不发布, 但指标数是给人看的门面)。
     # README 的源就是仓库里的 README.md 本身, 所以渲染时把"字面量"回写成占位符形态再渲染 ——
     # 既保持源码里始终是 __METRIC_COUNT__(避免下次改指标数时源码与产物不一致), 又不必来回改写文件。

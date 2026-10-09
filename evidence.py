@@ -165,6 +165,28 @@ def main():
     if "机制推演" in pages.get("northstar.html", ""):
         ok("审计页已把证据强度改写为『机制推演 / 可复现』")
 
+    # ---------- D. 流批对账(流式样例): 守恒 + 页面引用数字可复算 ----------
+    sc = load("stream_compare.json")
+    if sc:
+        s = sc["stats"]
+        if s["wm_total"] + s["wm_dropped"] != s["batch_total"]:
+            fail(f"流批对账不守恒: watermark {s['wm_total']} + 丢弃 {s['wm_dropped']}"
+                 f" != 批 {s['batch_total']}")
+        elif s["arrival_total"] != s["batch_total"]:
+            fail(f"到达序总数 {s['arrival_total']} != 批 {s['batch_total']} —— 数据被丢/被复制")
+        else:
+            ok(f"流批对账守恒: 批 {s['batch_total']:,} = 流(watermark) {s['wm_total']:,}"
+               f" + 迟到丢弃 {s['wm_dropped']}; 到达序不丢但 {s['misplaced']} 条错窗")
+        rt = ROOT / "out" / "realtime.html"
+        if rt.exists():
+            rt_text = rt.read_text(encoding="utf-8")
+            for label, v in (("迟到丢弃", str(s["wm_dropped"])),
+                             ("错窗", str(s["misplaced"])), ("批", f"{s['batch_total']:,}")):
+                if v in rt_text:
+                    ok(f"realtime 页引用的{label}数字 {v} 与产物一致")
+                else:
+                    warn(f"realtime 页未引用{label}数字 {v} —— 若已改文案请同步")
+
     print_report()
     return 1 if FAIL else 0
 

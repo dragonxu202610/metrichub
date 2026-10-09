@@ -29,6 +29,9 @@ CHECKS = [
     ("sources.html", "不含任何内部数据", "信源页诚实声明"),
     ("sources.html", "finance.sina.com.cn", "信源页晚点出处可点"),
     ("layer.html", "dbt-docs/index.html", "语义层页血缘图入口"),
+    ("realtime.html", "演示级", "流式页演示级标注"),
+    ("realtime.html", "forBoundedOutOfOrderness", "Flink 原语映射表"),
+    ("realtime.html", "stream_compare.json", "流批对账数据源"),
 ]
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 SITE, OUT = ROOT / "site", ROOT / "out"
 # 构建期渲染的占位符: 比对前先"预渲染"一遍源文件, 否则 out/ 永远与 site/ 不同
-TOKENS = ("__METRIC_COUNT__",)
+TOKENS = ("__METRIC_COUNT__", "__STREAM_BATCH__", "__STREAM_DROPPED__", "__STREAM_MISPLACED__")
 
 
 def render(text, values):
@@ -28,14 +28,26 @@ def render(text, values):
 def token_values():
     """占位符的"真值"必须来自源(metrics.yaml), 不能取自产物 ——
     否则加了指标但没重跑 build 时, 比对会自证同步, 正是要防的漂移。"""
-    n = "?"
+    values = {t: "" for t in TOKENS}
     try:
         import yaml
         with open(ROOT / "metrics.yaml", encoding="utf-8") as f:
-            n = str(len(yaml.safe_load(f)["metrics"]))
+            values["__METRIC_COUNT__"] = str(len(yaml.safe_load(f)["metrics"]))
     except Exception as e:                                   # noqa: BLE001
         print(f"[!] 无法读取 metrics.yaml 的指标数({e}), 占位符比对降级")
-    return {t: (n if t == "__METRIC_COUNT__" else "") for t in TOKENS}
+    # 流式三数字的真值同样来自源(streaming 重放是确定性的, 不读产物) —— 理由与指标数相同:
+    # 若取自产物, 改了重放参数没重跑 build 时, 比对会自证同步。
+    try:
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from streaming.replay import replay
+        s = replay()["stats"]
+        values["__STREAM_BATCH__"] = f"{s['batch_total']:,}"
+        values["__STREAM_DROPPED__"] = str(s["wm_dropped"])
+        values["__STREAM_MISPLACED__"] = str(s["misplaced"])
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[!] 无法重放流式对账取占位符真值({e}), 流式三项比对降级")
+    return values
 
 
 def main():
