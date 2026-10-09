@@ -245,6 +245,25 @@ def main():
             elif "近 14 天新注册 5,961" not in mx and "5,961" in mx:
                 fail("metrics 页 5,961 未标注『近 14 天』窗口口径 —— 同名指标两种读法, 必须钉死标签")
 
+    # ---------- F. 指标体系分类表: 行数=目录 且引用的指标名全部真实存在 ----------
+    # 分类表(tax-atom/tax-calc)声称"31 行与目录一一对应" —— 这句承诺本身要被机器校验:
+    # 行格式为 <tr><td><code>name</code></td>... 首格即指标名, 与 catalog 求差集。
+    mtext2 = (rendered or pages).get("metrics.html", "")
+    if mtext2 and cat is not None:
+        import re as _re2
+        names = _re2.findall(r'<tr><td><code>([a-z][a-z0-9_]+)</code></td>', mtext2)
+        known = {m["name"] for m in cat}
+        ghost = sorted(set(n for n in names if n not in known))
+        dups = sorted({n for n in names if names.count(n) > 1})
+        if ghost:
+            fail(f"指标体系分类表引用了不存在的指标: {ghost}")
+        elif dups:
+            fail(f"指标体系分类表存在重复行: {sorted(set(dups))}")
+        elif len(names) != len(cat):
+            fail(f"指标体系分类表共 {len(names)} 行 != 目录 {len(cat)} 个指标 —— 漏分类或多分类")
+        else:
+            ok(f"指标体系分类表 {len(names)} 行与目录一一对应(原子+计算全覆盖, 无幽灵指标)")
+
     print_report()
     return 1 if FAIL else 0
 

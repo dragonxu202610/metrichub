@@ -22,7 +22,31 @@
   本页与<a href="domains.html">业务结构页</a>的【规划】项是<b>生产路线图的显式记录</b>（演示环境不实现、但定义草案已就位），
   不是待修缺陷——把"现在做不了什么"写清楚，与把"做了什么"写清楚同样重要。</div>
 
-  <h2 class="sec"><span class="no">1</span>北极星：结论卡</h2>
+  <h2 class="sec"><span class="no">1</span>构建方法：原子指标 → 衍生指标 → 计算指标</h2>
+  <p class="sec-sub">指标体系不是 31 条平铺的定义，而是一座三层金字塔：<b>原子指标</b>（事实表的裸聚合，不可再拆）→
+  <b>衍生指标</b>（原子 + 时间周期 + 修饰词 + 统计粒度——"口径"就住在这一层）→ <b>计算指标</b>（指标÷指标、指标−指标的复合）。
+  本项目 31 个注册指标 = <b>14 原子 + 17 计算</b>，每个计算指标都能拆回原子血缘（见第 5、6 节）。</p>
+  <table class="tb">
+    <tr><th style="width:110px">层</th><th>定义</th><th>本项目的实现形态</th><th style="width:74px">数量</th></tr>
+    <tr><td><b>原子指标</b></td>
+      <td>挂在单张事实表上的裸聚合度量：计数 / 去重计数 / 求和 / 中位数——<b>不可再拆</b>，是全部上层指标的分子分母来源</td>
+      <td><code>count(*) FILTER (WHERE success)</code>、<code>sum(amount) FILTER (WHERE NOT refund)</code>、<code>count(DISTINCT user_id)</code>…（FILTER 是修饰词，不改变原子性）</td>
+      <td class="r"><b>14</b></td></tr>
+    <tr><td><b>衍生指标</b><br><span class="small">（口径层）</span></td>
+      <td>原子指标 + <b>时间周期</b>（1d/7d/14d/滚动）+ <b>修饰词</b>（业务限定：非退款/成功/首触/线性/免费发放…）+ <b>统计粒度</b>（窗口单值/逐日/滚动去重）</td>
+      <td>metrics.yaml 的 spec 就是衍生层的显式声明：<code>default_time</code>=周期、<code>expr 的 FILTER</code>=修饰词、<code>grain/series_grain/rolling_distinct_on</code>=粒度。
+      同一度量换周期即新衍生指标（daily vs weekly_successful_creations）</td>
+      <td class="r">31 <span class="small">(全部)</span></td></tr>
+    <tr><td><b>计算指标</b></td>
+      <td>由两个及以上衍生指标经运算复合：比率（÷）、差值（−）、占比（×100）——<b>必须声明可加性与分母保护</b></td>
+      <td>受限于自研引擎不支持指标间引用（见<a href="semantic.html">语义层·能力边界</a>），计算指标目前以"双聚合写进单条 expr"实现（如 arppu = sum÷count 同窗同表）；生产用 MetricFlow derived/ratio metric</td>
+      <td class="r"><b>17</b></td></tr>
+  </table>
+  <div class="co co-note"><span class="cot">两条铁律（从事故里来的）</span>
+  ① 计算指标的<b>分子分母必须同窗同口径</b>——毛利率分子分母若一个 7d 一个 14d，算出来的数没有任何业务含义；
+  ② 比率分母一律 <code>nullif(·,0)</code> / <code>greatest(·,1)</code>——分母为 0 时出 null 而不是 inf（inf 会被写成非法 JSON，前端整页抛错）。</div>
+
+  <h2 class="sec"><span class="no">2</span>北极星：结论卡</h2>
   <div class="card">
     <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
       <span style="font-size:15px;font-weight:700">北极星 = <code>active_creators</code> 周活跃成功创作者数</span>
@@ -41,7 +65,7 @@
     <a href="api/northstar_evidence.json" target="_blank" rel="noopener">northstar_evidence.json</a>。</p>
   </div>
 
-  <h2 class="sec"><span class="no">2</span>为什么是「人」不是「次数/分钟」：机制论证</h2>
+  <h2 class="sec"><span class="no">3</span>为什么是「人」不是「次数/分钟」：机制论证</h2>
   <div class="grid g2">
     <div class="dcard"><div class="dh"><b>计量单位与成本单位不同构</b></div>
       <ul><li>次数把 2 秒与 12 秒同记为 1（实测平均 <b class="num">7.0 秒/次</b>，恰为生成时长分布的算术结果）</li>
@@ -51,7 +75,7 @@
       <li>护栏数据佐证：Veo 3.1 成功率 <b class="num">96.7%</b> 全场最高、创作占比仅 5.4%、毛利 <b style="color:var(--bad)">−125.6%</b>——次数上升可与毛利下降同时发生</li></ul></div>
   </div>
 
-  <h2 class="sec"><span class="no">3</span>输入指标树：四个增长引擎 + 变现验证边</h2>
+  <h2 class="sec"><span class="no">4</span>输入指标树：四个增长引擎 + 变现验证边</h2>
   <p class="sec-sub">增长引擎逻辑：什么带来新创作者（A）→ 什么让他们第一次成功（B）→ 什么让他们每周回来（C）→ 什么加深使用（D）→ 这一切能否换成钱（E）。</p>
   <ul class="tree">
     <li><span class="tnode root"><b>active_creators</b> 周活跃创作者 <span class="tnum num">4,278</span> <span class="tg-acc">北极星</span><span class="tv">滚动 7 日去重，非可加</span></span>
@@ -92,7 +116,223 @@
       </ul></li>
   </ul>
 
-  <h2 class="sec"><span class="no">4</span>证据与边界：同向，但不线性</h2>
+
+  <h2 class="sec"><span class="no">5</span>31 指标全景：分类 × 度量 × 口径</h2>
+  <p class="sec-sub">分类表的每一行都对应 metrics.yaml 的一条注册（行数与目录一一对应，由 evidence 门禁机器校验）。
+  「修饰词」列就是衍生层的业务限定——同一个原子度量，换修饰词就是另一个口径；「计算式」列是计算指标拆回原子的血缘。</p>
+
+  <h3>原子指标 · 14 个 —— 全部上层指标的分子分母来源</h3>
+  <table class="tb" id="tax-atom">
+    <tr><th style="width:230px">指标</th><th style="width:150px">度量 · 事实表</th><th style="width:110px">时间周期</th><th>修饰词（业务限定）</th></tr>
+    <tr><td><code>weekly_successful_creations</code></td><td>计数 · dwd_task_ch</td><td>7d 窗口</td><td>成功任务</td></tr>
+    <tr><td><code>daily_successful_creations</code></td><td>计数 · dwd_task_ch</td><td>逐日</td><td>成功任务（上一行的日形态）</td></tr>
+    <tr><td><code>minutes_generated</code></td><td>秒数和÷60 · dwd_task</td><td>逐日</td><td>成功任务</td></tr>
+    <tr><td><code>weekly_minutes_generated</code></td><td>秒数和÷60 · dwd_task</td><td>7d 窗口</td><td>成功任务</td></tr>
+    <tr><td><code>active_creators</code></td><td>去重计数 · dwd_task_ch</td><td>7d 滚动去重</td><td>成功任务 · 北极星（逐日相加=人·天，禁止）</td></tr>
+    <tr><td><code>first_day_creations</code></td><td>计数 · dwd_user</td><td>注册当日</td><td>首日激活（activated_1d）的用户</td></tr>
+    <tr><td><code>new_users</code></td><td>计数 · dwd_user</td><td>逐日</td><td>注册事件</td></tr>
+    <tr><td><code>dau</code></td><td>去重计数 · dwd_event</td><td>逐日</td><td>页面事件（与成功生成口径组不同）</td></tr>
+    <tr><td><code>ttfc_median</code></td><td>中位数 · dwd_user</td><td>全窗单值</td><td>已 7d 激活的用户（分钟精度，防 0/1440 退化）</td></tr>
+    <tr><td><code>paying_users</code></td><td>去重计数 · dwd_order</td><td>窗口</td><td>非退款订单</td></tr>
+    <tr><td><code>revenue_daily</code></td><td>金额和 · dwd_order</td><td>逐日</td><td>非退款 —— <b>现金口径之锚</b>，毛利分母的唯一来源</td></tr>
+    <tr><td><code>channel_revenue_first_touch</code></td><td>金额和 · dwd_order</td><td>窗口</td><td>非退款 · 首触（按注册渠道归属）</td></tr>
+    <tr><td><code>channel_revenue_linear</code></td><td>金额和÷触点数 · dwd_order</td><td>窗口</td><td>非退款 · 线性权重(1/touch_cnt) —— 当前数据下不可用于预算决策</td></tr>
+    <tr><td><code>balance_capped_revenue_gap</code></td><td>行内差求和(秒−积分) · dwd_task</td><td>窗口</td><td>成功且余额封顶 —— "生成免单化"缺口</td></tr>
+  </table>
+
+  <h3>计算指标 · 17 个 —— 血缘与分母保护</h3>
+  <table class="tb" id="tax-calc">
+    <tr><th style="width:230px">指标</th><th style="width:150px">事实表</th><th style="width:100px">周期</th><th>计算式（拆回原子血缘）</th></tr>
+    <tr><td><code>creations_per_active_user</code></td><td>dwd_task_ch</td><td>7d</td><td>成功创作数 <b>÷</b> 活跃创作者数（同窗去重）—— 防"一人一条"</td></tr>
+    <tr><td><code>seo_signup_share</code></td><td>dwd_user</td><td>7d</td><td>SEO 渠道注册数 <b>÷</b> 总注册数</td></tr>
+    <tr><td><code>cac</code></td><td>dws_channel_roas</td><td>14d</td><td>渠道花费(D6) <b>÷</b> 该渠道新注册(D1) —— <b>跨数据域计算</b></td></tr>
+    <tr><td><code>activation_1d</code></td><td>dwd_user</td><td>注册 cohort</td><td>首日激活数 <b>÷</b> 注册数（队列成熟度已标注）</td></tr>
+    <tr><td><code>activation_7d</code></td><td>dwd_user</td><td>注册 cohort</td><td>7d 内激活数 <b>÷</b> 注册数 —— 与 1d 双口径并存</td></tr>
+    <tr><td><code>retention_d1</code></td><td>dwd_user</td><td>注册 cohort</td><td>严格次日活跃数 <b>÷</b> 注册数（次日当天，非无界滚动）</td></tr>
+    <tr><td><code>effect_penetration</code></td><td>dwd_event</td><td>逐日</td><td>特效页去重用户 <b>÷</b> 全站去重用户</td></tr>
+    <tr><td><code>payers_ratio</code></td><td>dwd_user</td><td>累计</td><td>ever_paid 用户 <b>÷</b> 全体用户（累计渗透，非窗口口径）</td></tr>
+    <tr><td><code>arppu</code></td><td>dwd_order</td><td>窗口</td><td>非退款现金 <b>÷</b> 付费用户数（nullif 保护）</td></tr>
+    <tr><td><code>free_credit_burn_rate</code></td><td>dwd_credits</td><td>7d</td><td>免费额度消耗 <b>÷</b> 免费发放（分母枚举写死，新增发放类型须显式登记）</td></tr>
+    <tr><td><code>paid_credit_burn_rate</code></td><td>dwd_credits</td><td>7d</td><td>积分总消耗 <b>÷</b> 付费发放 —— 大于100% 即口径警报（分子含免费消耗）</td></tr>
+    <tr><td><code>model_gross_margin</code></td><td>dws_model_day</td><td>14d</td><td>(分摊收入 − API成本) <b>÷</b> 分摊收入 —— 收入按积分占比分摊回现金</td></tr>
+    <tr><td><code>model_success_rate</code></td><td>dws_model_day</td><td>14d</td><td>成功调用 <b>÷</b> 总调用</td></tr>
+    <tr><td><code>roas</code></td><td>dws_channel_roas</td><td>14d</td><td>首触归因收入(D4) <b>÷</b> 渠道花费(D6) —— 跨域计算</td></tr>
+    <tr><td><code>payer_retention_wow</code></td><td>dws_payer_cohort</td><td>周环比快照</td><td>两周都付费 <b>÷</b> 上周付费（分子防"大于100% 吃掉坏消息"）</td></tr>
+    <tr><td><code>company_gross_margin</code></td><td>dws_company_day</td><td>14d</td><td>(全模型收入 − 全模型成本) <b>÷</b> 收入 —— 与 model 口径同构不分组</td></tr>
+    <tr><td><code>high_cost_exposure</code></td><td>dws_cost_tier_day</td><td>14d</td><td>高成本档成功任务 <b>÷</b> 全部成功任务（阈值 $0.03/s 为经验值）</td></tr>
+  </table>
+  <p class="tb-note">注：原子/计算之别按"expr 是否含聚合间运算"判定（如 minutes_generated 的 ÷60 是单位换算，不改原子性；
+  channel_revenue_linear 的 ÷touch_cnt 是行内权重，属修饰词）。两表行数 14+17=31，与目录一一对应。</p>
+
+  <h2 class="sec"><span class="no">6</span>指标关系：四条计算链（谁是谁的分子分母）</h2>
+  <p class="sec-sub">计算指标的血缘不是文档修辞——改一个原子口径，下游整条链的数字都要重算。
+  下图按业务问题分四条链，箭头即"分子/分母来源"：<b>跨数据域的计算指标（cac、roas）是烟囱式系统最容易算错的地方</b>，因为分子分母在两张不同的烟囱表里。</p>
+  <div class="arch">
+  <svg viewBox="0 0 940 532" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/>
+      </marker>
+    </defs>
+    <g font-size="11.5">
+      <g font-weight="700" fill="#3c34ad">
+        <text x="16" y="58">人 · 增长引擎链</text>
+        <text x="16" y="185">钱 · 收入毛利链</text>
+        <text x="16" y="315">获客 · 投放归因链</text>
+        <text x="16" y="438">量 · 成本质量链</text>
+      </g>
+      <g>
+        <rect x="30" y="70" width="150" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="105" y="91" text-anchor="middle" fill="#15181e">new_users</text>
+        <rect x="250" y="70" width="180" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="340" y="91" text-anchor="middle" fill="#15181e">first_day_creations</text>
+        <rect x="500" y="70" width="170" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="585" y="91" text-anchor="middle" fill="#3c34ad">activation_1d / 7d</text>
+        <rect x="250" y="122" width="170" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="335" y="143" text-anchor="middle" fill="#15181e">retention_d1</text>
+        <rect x="500" y="122" width="170" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="585" y="143" text-anchor="middle" fill="#15181e">active_creators ★</text>
+        <rect x="720" y="122" width="180" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="810" y="143" text-anchor="middle" fill="#3c34ad">creations_per_active_user</text>
+        <g stroke="#8b93a1" stroke-width="1.3" fill="none">
+          <line x1="180" y1="87" x2="246" y2="87" marker-end="url(#arr2)"/>
+          <line x1="430" y1="87" x2="496" y2="87" marker-end="url(#arr2)"/>
+          <path d="M105,104 L105,139 L246,139" marker-end="url(#arr2)"/>
+          <line x1="420" y1="139" x2="496" y2="139" marker-end="url(#arr2)"/>
+          <line x1="670" y1="139" x2="716" y2="139" marker-end="url(#arr2)"/>
+        </g>
+        <text x="196" y="80" font-size="10.5" fill="#8b93a1">激活÷注册</text>
+        <text x="672" y="116" font-size="10.5" fill="#8b93a1">次数÷人数</text>
+      </g>
+      <g>
+        <rect x="30" y="197" width="170" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="115" y="218" text-anchor="middle" fill="#15181e">revenue_daily 现金</text>
+        <rect x="30" y="249" width="170" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="115" y="270" text-anchor="middle" fill="#15181e">paying_users 付费人数</text>
+        <rect x="270" y="197" width="170" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="355" y="218" text-anchor="middle" fill="#3c34ad">arppu</text>
+        <rect x="500" y="197" width="230" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="615" y="218" text-anchor="middle" fill="#3c34ad">model / company_gross_margin</text>
+        <rect x="270" y="249" width="230" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="385" y="270" text-anchor="middle" fill="#3c34ad">payers_ratio → payer_retention_wow</text>
+        <g stroke="#8b93a1" stroke-width="1.3" fill="none">
+          <line x1="200" y1="214" x2="266" y2="214" marker-end="url(#arr2)"/>
+          <line x1="200" y1="266" x2="266" y2="266" marker-end="url(#arr2)"/>
+          <line x1="440" y1="214" x2="496" y2="214" marker-end="url(#arr2)"/>
+        </g>
+        <text x="206" y="208" font-size="10.5" fill="#8b93a1">÷</text>
+        <text x="442" y="190" font-size="10.5" fill="#8b93a1">(收−本)÷收</text>
+        <text x="270" y="298" font-size="10.5" fill="#8b93a1">累计渗透 → 周环比留存（同表两步计算）</text>
+      </g>
+      <g>
+        <rect x="30" y="327" width="150" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="105" y="348" text-anchor="middle" fill="#15181e">spend 花费 D6</text>
+        <rect x="250" y="327" width="150" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="325" y="348" text-anchor="middle" fill="#3c34ad">cac</text>
+        <rect x="30" y="379" width="170" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="115" y="400" text-anchor="middle" fill="#15181e">first_touch 收入 D4</text>
+        <rect x="250" y="379" width="150" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="325" y="400" text-anchor="middle" fill="#3c34ad">roas</text>
+        <rect x="470" y="353" width="250" height="34" rx="8" fill="#fff" stroke="#d4d9e2" stroke-dasharray="5 3"/>
+        <text x="595" y="374" text-anchor="middle" fill="#5f6875">另一侧: new_users(D1) / spend(D6)</text>
+        <g stroke="#8b93a1" stroke-width="1.3" fill="none">
+          <line x1="180" y1="344" x2="246" y2="344" marker-end="url(#arr2)"/>
+          <line x1="200" y1="396" x2="246" y2="396" marker-end="url(#arr2)"/>
+          <line x1="400" y1="370" x2="466" y2="370" marker-end="url(#arr2)"/>
+        </g>
+        <text x="186" y="338" font-size="10.5" fill="#8b93a1">÷注册</text>
+        <text x="206" y="390" font-size="10.5" fill="#8b93a1">÷花费</text>
+        <text x="560" y="344" font-size="10.5" fill="#a9700e">跨数据域 D6×D4×D1: 烟囱最易算错处</text>
+      </g>
+      <g>
+        <rect x="30" y="450" width="220" height="34" rx="8" fill="#fff" stroke="#d4d9e2"/>
+        <text x="140" y="471" text-anchor="middle" fill="#15181e">任务计数/秒数/积分 · dwd_task</text>
+        <rect x="310" y="450" width="180" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="400" y="471" text-anchor="middle" fill="#3c34ad">model_success_rate</text>
+        <rect x="550" y="450" width="180" height="34" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="640" y="471" text-anchor="middle" fill="#3c34ad">high_cost_exposure</text>
+        <rect x="310" y="492" width="180" height="22" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="400" y="507" text-anchor="middle" fill="#3c34ad" font-size="10">burn_rate ×2</text>
+        <g stroke="#8b93a1" stroke-width="1.3" fill="none">
+          <line x1="250" y1="467" x2="306" y2="467" marker-end="url(#arr2)"/>
+          <line x1="490" y1="467" x2="546" y2="467" marker-end="url(#arr2)"/>
+          <path d="M250,480 L306,500" marker-end="url(#arr2)"/>
+        </g>
+      </g>
+    </g>
+  </svg>
+  </div>
+  <p class="tb-note">蓝底=计算指标，白底=原子指标。文字版血缘：毛利链 = 现金(非退款 sum) → 按当日积分消耗占比分摊到模型 →
+  (分摊收入 − 成本秒数×单价) ÷ 分摊收入；该链任何一环改口径（退款处理、分摊规则、单价表），三个毛利指标同时变——
+  这就是"口径变更必须升 version 且评估下游"的原因。</p>
+
+  <h2 class="sec"><span class="no">7</span>核心维度：下钻白名单与一致性来源</h2>
+  <p class="sec-sub">维度是指标体系的横轴。本项目 5 个业务维度 + 时间维度，每个指标声明自己的<b>可下钻白名单</b>（引擎对白名单外的维度直接抛错，防"静默拿总值冒充分组值"）；
+  维度本身的取值必须有单一来源（字典表），否则各表各自维护就会漂移。</p>
+  <table class="tb">
+    <tr><th style="width:90px">维度</th><th style="width:230px">取值 / 基数</th><th style="width:200px">一致性来源（现状）</th><th>治理要点</th></tr>
+    <tr><td><b>channel</b></td><td>9 值：3 自然 + 2 红人 + 2 付费 + 联盟 + 直达</td>
+      <td><span class="tg-ok">已收口</span> dim_channel seed</td>
+      <td>事实表由 assert_channels_conform 断言只允许字典内渠道；15/31 个指标可按它下钻（使用频次最高）</td></tr>
+    <tr><td><b>model</b></td><td>8 值：PixVerse V5 ~ Veo 3.1</td>
+      <td><span class="tg-ok">已收口</span> dim_model_cost（含 $/秒单价）</td>
+      <td>模型上下架=维表加行+全链重算；单价变更同时改变毛利链与成本档口径</td></tr>
+    <tr><td><b>platform</b></td><td>2 值：web / app</td>
+      <td><span class="tg-plan">枚举散落</span></td>
+      <td>低基数暂可容忍；规划 dim_platform 收口（与渠道同法）</td></tr>
+    <tr><td><b>country</b></td><td>7 值：US/BR/GB/DE/JP/SEA/OTHER</td>
+      <td><span class="tg-plan">枚举散落</span></td>
+      <td>出海业务天然维度；规划 dim_geo（附区域层级，支撑区域下钻）</td></tr>
+    <tr><td><b>plan</b></td><td>2 值：lite $15/300积分 · pro $29/800积分</td>
+      <td><span class="tg-plan">枚举散落</span>（含定价，最易漂移）</td>
+      <td>定价挂维表才安全（改价=维表行更新+口径升版）；规划 dim_plan(含价格/积分额)</td></tr>
+    <tr><td><b>dt</b></td><td>窗口 1d/7d/14d/30d · 粒度 window/daily/滚动</td>
+      <td>语义层 WINDOWS 字面量（check.py 断言三处一致）</td>
+      <td>时间不是普通维度：grain 决定数字语义；无时间 spine，空日靠数据自身补齐</td></tr>
+  </table>
+
+  <h3>维度 × 指标矩阵（按域分组，✓=可下钻，·=未开放）</h3>
+  <p class="sec-sub">从 31 个指标的 dimensions 声明如实生成。读法：channel 覆盖 15 个指标（获客归因全域可用）；
+  毛利类只按 model 下钻（公司级不分组的同构口径）；燃烧率无维度（台账未建渠道维度，属 D5 粗糙点）。
+  同口径指标合并成行（如两个 burn_rate、两组毛利），行数 22 = 31 个指标的全覆盖。</p>
+  <table class="tb" style="font-size:12px">
+    <tr><th>指标</th><th class="r">channel</th><th class="r">model</th><th class="r">platform</th><th class="r">country</th><th class="r">plan</th></tr>
+    <tr><td colspan="6" style="background:#fafbfd;font-weight:700;font-size:11px;color:#8b93a1">北极星（7）</td></tr>
+    <tr><td><code>weekly_successful_creations</code> / <code>daily_successful_creations</code> <span class="small">原子</span></td><td class="r">✓</td><td class="r">✓</td><td class="r">✓</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>minutes_generated</code> / <code>weekly_minutes_generated</code> <span class="small">原子</span></td><td class="r">·</td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>active_creators</code> <span class="small">原子·北极星</span></td><td class="r">✓</td><td class="r">·</td><td class="r">✓</td><td class="r">✓</td><td class="r">·</td></tr>
+    <tr><td><code>creations_per_active_user</code> <span class="small">计算</span></td><td class="r">✓</td><td class="r">·</td><td class="r">✓</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>first_day_creations</code> <span class="small">原子</span></td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">✓</td><td class="r">·</td></tr>
+    <tr><td colspan="6" style="background:#fafbfd;font-weight:700;font-size:11px;color:#8b93a1">增长（5）</td></tr>
+    <tr><td><code>new_users</code> <span class="small">原子</span></td><td class="r">✓</td><td class="r">·</td><td class="r">✓</td><td class="r">✓</td><td class="r">·</td></tr>
+    <tr><td><code>dau</code> <span class="small">原子</span></td><td class="r">·</td><td class="r">·</td><td class="r">✓</td><td class="r">✓</td><td class="r">·</td></tr>
+    <tr><td><code>seo_signup_share</code> <span class="small">计算</span></td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">✓</td><td class="r">·</td></tr>
+    <tr><td><code>cac</code> / <code>roas</code> <span class="small">计算·跨域</span></td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td colspan="6" style="background:#fafbfd;font-weight:700;font-size:11px;color:#8b93a1">产品（5）</td></tr>
+    <tr><td><code>activation_1d</code> / <code>activation_7d</code> <span class="small">计算</span></td><td class="r">✓</td><td class="r">·</td><td class="r">✓ <span class="small">仅1d</span></td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>ttfc_median</code> <span class="small">原子</span></td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>retention_d1</code> <span class="small">计算</span></td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>effect_penetration</code> <span class="small">计算</span></td><td class="r">·</td><td class="r">·</td><td class="r">✓</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td colspan="6" style="background:#fafbfd;font-weight:700;font-size:11px;color:#8b93a1">商业化（8）</td></tr>
+    <tr><td><code>paying_users</code> / <code>arppu</code> <span class="small">原子/计算</span></td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">✓</td><td class="r">✓</td></tr>
+    <tr><td><code>revenue_daily</code> <span class="small">原子</span></td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">✓</td></tr>
+    <tr><td><code>payers_ratio</code> <span class="small">计算</span></td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>payer_retention_wow</code> <span class="small">计算</span></td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">✓</td></tr>
+    <tr><td><code>free_credit_burn_rate</code> / <code>paid_credit_burn_rate</code> <span class="small">计算</span></td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>balance_capped_revenue_gap</code> <span class="small">原子</span></td><td class="r">·</td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td colspan="6" style="background:#fafbfd;font-weight:700;font-size:11px;color:#8b93a1">模型（4）+ 归因（2）</td></tr>
+    <tr><td><code>model_gross_margin</code> / <code>model_success_rate</code> <span class="small">计算</span></td><td class="r">·</td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>company_gross_margin</code> / <code>high_cost_exposure</code> <span class="small">计算</span></td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+    <tr><td><code>channel_revenue_first_touch</code> / <code>channel_revenue_linear</code> <span class="small">原子</span></td><td class="r">✓</td><td class="r">·</td><td class="r">·</td><td class="r">·</td><td class="r">·</td></tr>
+  </table>
+  <p class="tb-note">矩阵如实反映 dimensions 声明，与指标目录页每条的"可选维度"一字不差——两处同源于 metrics.yaml。
+  时间维度不列入：所有指标都带窗口/粒度声明（grain），它决定数字语义而非下钻方向。</p>
+  <div class="co co-note"><span class="cot">维度使用纪律（三条）</span>
+  ① <b>白名单外即抛错</b>：引擎 compile() 对未声明维度报错而非静默丢弃——"错了但看起来对"是最危险的失败模式；
+  ② <b>可加性决定维度求和合法性</b>：additive 指标可按渠道日值求和回窗口值，non_additive（比率/去重）只能窗口内聚合；
+  ③ <b>维度值必须有字典</b>：channel/model 已收口 seed + 一致性断言，platform/country/plan 的收口在规划里（见上表）。</div>
+
+  <h2 class="sec"><span class="no">8</span>证据与边界：同向，但不线性</h2>
   <div class="card">
     <p style="margin:0 0 6px">相邻两日对比：<b class="num">__PAIR1_FROM__→__PAIR1_TO__</b> 创作数 +8.1% 而收入 +84.3%，<b>弹性 10.4</b>；
     另一组相邻日（<b class="num">__PAIR2_FROM__→__PAIR2_TO__</b>，+15.9% vs +32.9%）弹性约 <b>2.06</b> —— 两组同为"同向"，弹性却差约 5 倍。</p>
@@ -101,7 +341,7 @@
     以上均为演示数据上的<b>机制推演 / 可复现复算</b>，不是对任何真实公司的实证。</p>
   </div>
 
-  <h2 class="sec"><span class="no">5</span>护栏指标：防「为拉北极星而伤害公司」</h2>
+  <h2 class="sec"><span class="no">9</span>护栏指标：防「为拉北极星而伤害公司」</h2>
   <table class="tb">
     <tr><th style="width:90px">护栏</th><th style="width:300px">指标与现值</th><th>防什么 · 反例动作</th></tr>
     <tr><td><b>毛利</b></td><td>company_gross_margin <b class="num">12.9%</b>（旧口径 33.1% 已修）；model_gross_margin（Veo 3.1 <span style="color:var(--bad)">−125.6%</span>）<span class="tg-ok">已实现</span></td>
@@ -114,7 +354,7 @@
       <td>防 paying_users 之外的口径盲区。反例：强推 Pro $29 不管理预期冲收入</td></tr>
   </table>
 
-  <h2 class="sec"><span class="no">6</span>反向指标（counter metrics）</h2>
+  <h2 class="sec"><span class="no">10</span>反向指标（counter metrics）</h2>
   <table class="tb">
     <tr><th style="width:240px">反向指标</th><th style="width:110px">状态</th><th>说明</th></tr>
     <tr><td>任务失败率</td><td><span class="tg-ok">半有</span></td>
@@ -125,7 +365,7 @@
     <tr><td>深度创作者占比</td><td><span class="tg-bad">无</span></td><td>deep_creator_share <span class="tg-plan">规划</span>：防「尝鲜撑起北极星」，即审计推翻条件 R2 的观测项</td></tr>
   </table>
 
-  <h2 class="sec"><span class="no">7</span>分域 KPI 视图：各域盯什么，坏了说明什么</h2>
+  <h2 class="sec"><span class="no">11</span>分域 KPI 视图：各域盯什么，坏了说明什么</h2>
   <table class="tb">
     <tr><th style="width:80px">域</th><th>盯什么</th><th>坏了说明什么</th></tr>
     <tr><td><b>增长</b></td><td>new_users · cac · seo_signup_share · roas · channel_revenue_first_touch</td>
@@ -138,7 +378,7 @@
       <td>毛利率负 → 定价/成本结构；成功率降 → 直接砸北极星；exposure 升 → 流量押注最贵档（现金平衡点 $0.0217/秒，$0.03 阈值偏保守）</td></tr>
   </table>
 
-  <h2 class="sec"><span class="no">8</span>证伪条件：北极星怎么被推翻（判据预注册）</h2>
+  <h2 class="sec"><span class="no">12</span>证伪条件：北极星怎么被推翻（判据预注册）</h2>
   <table class="tb">
     <tr><th style="width:60px">规则</th><th>内容</th><th style="width:150px">状态</th></tr>
     <tr><td><b>R1</b></td><td>若真实数据下三候选与收入的弹性/相关显著分化（判据代码先于结果提交），按数据改判</td>
@@ -151,7 +391,7 @@
   <p class="tb-note">七条推翻条件的完整三态标注随评估落盘在 northstar_evidence.json 的 <code>falsification_checks</code> 字段
   （现在可执行 4 / 部分可执行 1 / 需新增定义 1 / 需补埋点 1）；拆解树覆盖率见同文件 <code>tree_coverage</code>（7 叶中 5 已定义）。</p>
 
-  <h2 class="sec"><span class="no">9</span>31 个指标健康度盘点（粗糙点直说）</h2>
+  <h2 class="sec"><span class="no">13</span>31 个指标健康度盘点（粗糙点直说）</h2>
   <div class="grid g4">
     <div class="stat acc"><div class="n">28</div><div class="l">承担树/护栏/反向节点</div></div>
     <div class="stat"><div class="n">3</div><div class="l">降级（同口径形态/失效口径）</div></div>
