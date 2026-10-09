@@ -1,0 +1,93 @@
+# MetricHub 黄金查询集：14 个真实业务问题
+# 每条 = 业务问题(人话) → 语义查询(metric/dims/window/granularity) → 结果断言
+# 这是语义层的"验收测试"(构建方法论 S6 的第二道关): 口径变更后重跑本文件,
+# 任何一条 FAIL 都精确说明"哪个数字变了/哪个行为变了"——不依赖任何人记得旧口径。
+# 断言三类:
+#   known   已知值(固定种子+锚点平移数值不变 → 断言值天然稳定)
+#   sanity  布尔表达式(以 rows 为作用域求值, 含守恒/排序/符号断言)
+#   error   行为断言(查询必须抛错且报错含指定子串——把"显式失败"变成测试)
+# 参考形态: semantic-layer-lab/golden(指南 S6); 本集针对本项目已知口径坑定制
+version: 1
+
+queries:
+  - id: G01
+    question: 北极星现在是多少人？(7d 窗口单值)
+    call: { metric: active_creators, window: 7d, granularity: window }
+    assert: { known: 4278, tol: 0.5 }
+
+  - id: G02
+    question: 近一周成功创作多少次？
+    call: { metric: weekly_successful_creations, window: 7d, granularity: window }
+    assert: { known: 13542, tol: 0.5 }
+
+  - id: G03
+    question: 各模型毛利率全景(14d)——谁在亏？
+    call: { metric: model_gross_margin, dims: [model], window: 14d, granularity: window }
+    assert:
+      exact_rows: 8
+      sanity: "any(r['value'] < -100 for r in rows) and all(r['model'] for r in rows)"
+
+  - id: G04
+    question: 首触归因的渠道收入合计守恒吗？(应回到 14d 现金 2,829)
+    call: { metric: channel_revenue_first_touch, dims: [channel], window: 14d, granularity: window }
+    assert:
+      exact_rows: 9
+      sanity: "abs(sum(r['value'] for r in rows) - 2829) <= 1"
+
+  - id: G05
+    question: 线性归因合计为何小于首触？(40% 收入无归属)
+    call: { metric: channel_revenue_linear, dims: [channel], window: 14d, granularity: window }
+    assert:
+      exact_rows: 9
+      sanity: "0 < sum(r['value'] for r in rows) < 2829"
+
+  - id: G06
+    question: 北极星按渠道拆——谁是最大来源渠道？(去重不可加，仅看极值不看排序)
+    call: { metric: active_creators, dims: [channel], window: 14d, granularity: window }
+    assert:
+      exact_rows: 9
+      sanity: "max(rows, key=lambda r: r['value'])['channel'] == 'google-organic'"
+
+  - id: G07
+    question: 行为断言——给北极星请求未声明维度(model)必须报错, 不得静默丢维度
+    call: { metric: active_creators, dims: [model], window: 7d, granularity: window }
+    assert: { error: 不支持的维度 }
+
+  - id: G08
+    question: 行为断言——free_credit_burn_rate 声明 series_grain=none, 逐日拆分必须被引擎拒绝
+    call: { metric: free_credit_burn_rate, window: 7d, granularity: daily }
+    assert: { error: 不支持逐日拆分 }
+
+  - id: G09
+    question: 严格次日留存(14d 注册队列)——与无界滚动口径(84.2%)区分
+    call: { metric: retention_d1, window: 14d, granularity: window }
+    assert: { known: 48.1, tol: 0.05 }
+
+  - id: G10
+    question: 付费燃烧率(默认 7d)——大于 100% 是口径警报, 作为已知现象锁定
+    call: { metric: paid_credit_burn_rate, window: 7d, granularity: window }
+    assert: { known: 125.6, tol: 0.05 }
+
+  - id: G11
+    question: 公司毛利率(现金口径, 14d)——旧口径会虚高到 33.1%, 锁定真值
+    call: { metric: company_gross_margin, window: 14d, granularity: window }
+    assert: { known: 12.9, tol: 0.05 }
+
+  - id: G12
+    question: 付费留存按套餐(周环比)——比率不得超 100%(分子防"吃掉坏消息")
+    call: { metric: payer_retention_wow, dims: [plan], window: 14d, granularity: window }
+    assert:
+      exact_rows: 2
+      sanity: "all(0 < r['value'] <= 100 for r in rows)"
+
+  - id: G13
+    question: 行为断言——未注册的 90d 窗口必须报错(窗口是白名单不是任意值)
+    call: { metric: new_users, window: 90d, granularity: window }
+    assert: { error: 不支持的时间窗 }
+
+  - id: G14
+    question: 注册序列完整性(14d)——14 个点、合计 5,961(近 14 天窗口口径的锚定数)
+    call: { metric: new_users, window: 14d, granularity: daily }
+    assert:
+      exact_rows: 14
+      sanity: "abs(sum(r['value'] for r in rows) - 5961) <= 1"

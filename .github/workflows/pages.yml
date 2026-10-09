@@ -31,6 +31,7 @@ jobs:
       - run: python check.py --data
       - run: python evidence.py
       - run: python northstar_eval.py
+      - run: python golden.py
       - run: python js_syntax_probe.py
       - run: python compare_out.py
       - run: python verify_served.py --dir

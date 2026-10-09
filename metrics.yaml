@@ -8,6 +8,9 @@
 #   group        归属业务域(北极星/增长/产品/商业化/模型/归因)
 #   basis        物理表(DWD/DWS) —— 语义层不直捣业务库
 #   expr         聚合表达式(编译进 SELECT)
+#   metric_type  指标类型: simple(裸聚合)/filtered(带业务限定FILTER)/ratio(聚合÷聚合)/
+#                derived(含聚合间减法)/cumulative(滚动去重) —— 类型须与 expr 结构一致(check.py 校验)
+#   status       认证分级: certified(评审+数据侧验证过)/proposed/deprecated
 #   dimensions   可下钻维度
 #   default_time 默认时间窗口(AI 问答未指明时使用 —— 消灭隐式默认)
 #   grain        输出语义: window=窗口内聚合成单值 / daily=按日期逐日值
@@ -23,6 +26,8 @@ metrics:
   # grain 语义: window = 窗口内单值; daily = 逐日值
   # series_grain: daily = 可安全逐日拆分; none = 逐日拆分语义错误(如"去重付费用户"不能按日相加)
   - name: weekly_successful_creations
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 周成功创作数
     group: north_star
     desc: 近7个自然日成功完成的视频生成任务总数(消耗·规模口径, 与消耗积分同向)
@@ -45,6 +50,8 @@ metrics:
       ③ basis 用 dwd_task_ch, 维度含 channel, 增长域可按获取渠道归因。
 
   - name: daily_successful_creations
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 日成功创作数
     group: north_star
     desc: 当日成功完成的视频生成任务数(周成功创作数的逐日拆解, 用于看趋势)
@@ -60,6 +67,8 @@ metrics:
     series_grain: daily
 
   - name: minutes_generated
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 日生成视频分钟数
     group: north_star
     desc: 当日成功任务的视频秒数合计/60
@@ -75,6 +84,8 @@ metrics:
     series_grain: daily
 
   - name: weekly_minutes_generated
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 周生成视频分钟数
     group: north_star
     desc: 近7个自然日成功任务的视频秒数合计/60(消耗·成本视角：与厂商按秒计费同构, 长视频权重大)
@@ -95,11 +106,13 @@ metrics:
       不代表生产环境; 它演示的是口径选择, 不是绝对值。
 
   - name: active_creators
+    metric_type: cumulative   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 周活跃创作者数
     group: north_star
     # ★ 当前生效的公司北极星(唯一)。改这里必须同步 check.py 的唯一性断言与全站文案。
     north_star_status: approved
-    desc: 近7个自然日内完成≥1次成功生成的去重用户数(公司北极星：衡量"有多少人在持续得到价值")
+    desc: 窗口内完成过≥1次成功生成的去重用户数。反例——逐日点相加=『人·天』不是人数(实测 4,278 人会被加成 7,142), 序列必须按输出日重算滚动去重(由 rolling_distinct_on 支撑)
     owner: data
     version: 1
     basis: dwd_task_ch
@@ -123,6 +136,8 @@ metrics:
       逐日值由窗口函数滚动去重产出(rolling_distinct_on), 不可把逐日点相加。
 
   - name: creations_per_active_user
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 人均成功创作数
     group: north_star
     desc: 窗口内成功创作数 / 有创作的活跃创作者数(北极星拆解树中一度缺失的"人均"因子)
@@ -138,6 +153,8 @@ metrics:
     series_grain: none
 
   - name: first_day_creations
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 新用户首日成功创作数
     group: north_star
     desc: 注册当日即完成成功生成的用户数(把新增侧的"激活"翻译成北极星的单位)
@@ -158,6 +175,8 @@ metrics:
 
   # ---------- 增长 ----------
   - name: new_users
+    metric_type: simple   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 日新注册用户
     group: growth
     desc: 当日完成注册的去重新用户数
@@ -174,6 +193,8 @@ metrics:
     series_grain: daily
 
   - name: dau
+    metric_type: simple   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 日活跃用户
     group: growth
     desc: 当日有≥1条页面事件的去重用户(含Web与App, 排除测试账号)
@@ -193,6 +214,8 @@ metrics:
       注意: 去重类指标跨日不可相加(DAU 求和无意义), 上游若把逐日点加总即为口径事故.
 
   - name: seo_signup_share
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: SEO渠道注册占比
     group: growth
     desc: 首触渠道为自然搜索(SEO)的新用户 / 全部新用户
@@ -209,6 +232,8 @@ metrics:
     series_grain: daily
 
   - name: cac
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 渠道获客成本
     group: growth
     desc: 付费渠道花费 / 该渠道新用户数(仅对有花费的渠道有意义)
@@ -227,6 +252,8 @@ metrics:
 
   # ---------- 产品/激活 ----------
   - name: activation_1d
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 当日激活率
     group: product
     desc: 注册当日完成≥1次成功生成任务的新用户占比
@@ -247,6 +274,8 @@ metrics:
       队列成熟度: "注册当日"意味着最近 1 天的注册队列尚未走完, 末点会被系统性低估.
 
   - name: activation_7d
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 7日激活率
     group: product
     desc: 注册后7个自然日内完成≥1次成功生成的新用户占比
@@ -269,6 +298,8 @@ metrics:
       否则"尚未观测"会被读成"转化率 0%"。
 
   - name: ttfc_median
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 激活速度中位数(注册→首次生成)
     group: product
     desc: 新用户从注册到首次成功生成的间隔分钟中位数(仅统计已激活用户)
@@ -292,6 +323,8 @@ metrics:
     cohort_maturity_days: 7
 
   - name: retention_d1
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 次日留存率
     group: product
     desc: 注册日 Cohort 在注册次日当天仍有页面活动的比例(严格次日, 不是"此后任意一天")
@@ -315,6 +348,8 @@ metrics:
       消费端必须渲染为"未观测", 不得读成 0%。
 
   - name: effect_penetration
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 特效工坊渗透率
     group: product
     desc: 使用过特效工坊页面的活跃用户 / 全部活跃用户(病毒拉新入口的健康度)
@@ -331,9 +366,11 @@ metrics:
 
   # ---------- 商业化 ----------
   - name: paying_users
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 付费用户数
     group: monetization
-    desc: 近7个自然日内有≥1笔非退款订单的去重用户(含Web与App, 含Lite/Pro/Max)
+    desc: 窗口内产生过非退款订单的去重用户数(按人去重, 不按订单; 含各平台与套餐)。反例——与累计口径 payers_ratio(ever_paid 渗透)不同名不同义——窗口值回答『现在有多少人在付钱』, 累计值回答『历史上有多少人付过』
     owner: monetization
     version: 3
     basis: dwd_order
@@ -350,6 +387,8 @@ metrics:
       去重用户不可按日相加, series_grain=none; 若要看逐日趋势需另注册"日付费用户数".
 
   - name: payers_ratio
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 累计付费渗透率
     group: monetization
     desc: 窗口内注册用户中曾付费的比例(ever_paid 由 dwd_user 宽表派生)
@@ -370,9 +409,11 @@ metrics:
       队列成熟度: 窗口末日注册的用户当天不可能有过付费行为, 末点会被系统性低估(看板已标注)。
 
   - name: arppu
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 付费用户人均收入
     group: monetization
-    desc: 时间窗内非退款订单金额 / 去重付费用户数(无付费用户时出参 null, 不是 0)
+    desc: 窗口内非退款现金 ÷ 付费用户数——按人平均而非按单平均(客单价需另注册订单数指标, 两个口径都对但必须有两个名字)。分母为 0 时出 null(nullif 保护)
     owner: monetization
     version: 3
     basis: dwd_order
@@ -390,9 +431,11 @@ metrics:
       出参 null 表示"该窗口没有付费用户, 人均收入无定义", 消费端不得读作 0.
 
   - name: revenue_daily
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 日订阅收入
     group: monetization
-    desc: 当日非退款订单金额合计(美元)
+    desc: 当期实收现金(非退款订单金额合计, 时间锚点=订单日期)——本站收入唯一口径锚、毛利分母唯一来源。勿与『积分燃烧×单价』口径混用——白送额度的燃烧不是收入(旧口径曾致毛利虚高 33.1% vs 真值 12.9%)
     owner: monetization
     version: 1
     basis: dwd_order
@@ -405,6 +448,8 @@ metrics:
     series_grain: daily
 
   - name: free_credit_burn_rate
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 免费额度燃烧率
     group: monetization
     desc: 窗口内消耗积分 / 窗口内免费发放积分(注册赠送+登录奖励)；<55% 触发告警——免费额度沉淀过多
@@ -427,6 +472,8 @@ metrics:
       分母写死枚举: 台账新增 change_type(过期/回收/补偿)必须显式登记, 不会被自动算进分母。
 
   - name: paid_credit_burn_rate
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 付费积分燃烧率
     group: monetization
     desc: 窗口内消耗积分 / 窗口内付费发放积分(订阅附赠) —— 已售积分被用掉的比例
@@ -447,6 +494,8 @@ metrics:
 
   # ---------- 模型域 ----------
   - name: model_gross_margin
+    metric_type: derived   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 模型毛利率
     group: model
     desc: (收入 - API成本)/收入。收入=当期实收现金(非退款订单)按各模型消耗积分占比分摊; 成本=成功秒数×厂商单价
@@ -470,6 +519,8 @@ metrics:
       (模拟器对失败任务写 seconds=0, 不产生厂商成本) —— 生产若厂商对失败调用计费, 需补该口径。
 
   - name: model_success_rate
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 模型成功率
     group: model
     desc: 成功任务数 / 总任务数, 按模型
@@ -486,6 +537,8 @@ metrics:
 
   # ---------- 归因 ----------
   - name: channel_revenue_first_touch
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 渠道归因收入(首触)
     group: attribution
     desc: 按用户注册渠道(首次触点)归因的非退款订单金额 —— 评估渠道获客质量
@@ -503,6 +556,8 @@ metrics:
       归因双口径说明: 首触看获客质量, 线性看助攻价值(channel_revenue_linear), 两口径共存禁止混用.
 
   - name: channel_revenue_linear
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 渠道归因收入(线性)
     group: attribution
     desc: 订单金额在用户全部触点渠道间平分(触点=注册前30天内的渠道曝光/点击记录) —— 评估SEO等助攻渠道
@@ -526,6 +581,8 @@ metrics:
 
   # ---------- 护栏(公司级健康度, 防止为拉高北极星而损伤公司) ----------
   - name: roas
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 渠道投放回报率
     group: growth
     desc: 窗口内该渠道首触归因收入 / 窗口内该渠道花费 —— 付费渠道的预算取舍依据
@@ -547,6 +604,8 @@ metrics:
       生产修正: channel_spend 纳入 SEO 内容人力与外链成本; 在此之前本指标只读付费渠道。
 
   - name: payer_retention_wow
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 付费留存率(周环比)
     group: monetization
     desc: 上周有非退款订单的用户中, 本周仍有非退款订单的比例(订阅制最直接的续费代理)
@@ -570,6 +629,8 @@ metrics:
       消费端必须同时展示 as_of(见 build.py 写入的 as_of 字段), 不得只报数字。
 
   - name: balance_capped_revenue_gap
+    metric_type: filtered   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 余额截断收入缺口
     group: monetization
     desc: (已计费秒数 - 实扣积分) × $0.04 —— 免费额度不足导致"生成了但收不到钱"的部分(负毛利的直接来源)
@@ -592,6 +653,8 @@ metrics:
       生产环境需替换为"免费额度发放额 × 未消耗率 + 未计费超时"的真实口径。
 
   - name: company_gross_margin
+    metric_type: derived   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 公司级毛利率
     group: model
     desc: (实收现金 - 全部模型API成本)/实收现金 —— 与 model_gross_margin 同口径, 只是不按模型分组
@@ -615,6 +678,8 @@ metrics:
       那两者不是同一个量(实测日均 3.14 vs 窗口 12.90)。护栏看的是窗口值, 不需要日线。
 
   - name: high_cost_exposure
+    metric_type: ratio   # simple/filtered/ratio/derived/cumulative(与check.py结构校验一致)
+    status: certified       # certified/proposed/deprecated(认证分级, 见语义层页)
     title: 高成本模型曝光占比
     group: model
     desc: 落在高采购成本档(≥$0.03/秒)的成功任务占全部成功任务的比例 —— 流量有多少押在最贵的模型上

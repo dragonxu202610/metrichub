@@ -32,7 +32,13 @@
   </div>
 
   <h2 class="sec"><span class="no">2</span>五个问题的完整链路（L1 → L2 → SQL → 结果 → 裸 SQL 对照）</h2>
-  <p class="sec-sub">每张卡片可展开：注入的上下文（L1）→ 工具调用（L2）→ 语义层编译的 SQL → 结果 → 以及"裸 text-to-SQL 会错在哪"。</p>
+  <p class="sec-sub">每张卡片可展开：注入的上下文（L1）→ 工具调用（L2）→ 语义层编译的 SQL → 结果 → 以及"裸 text-to-SQL 会错在哪"。
+  五问的查询行为（含"非法维度必须报错"）已纳入 <a href="api/golden_results.json" target="_blank" rel="noopener">14 条黄金查询回归</a>——口径或行为的任何漂移都会在 CI 变红。</p>
+  <div class="co co-note"><span class="cot">工具契约三件套（NL2Metrics 的标准形态）</span>
+  生产级语义层 Agent 契约是三个工具：<code>list_metrics()</code>（发现有哪些指标）、<code>describe_metric(name)</code>（读口径：公式/分子分母/窗口）、
+  <code>query_metrics(metrics, group_by, start, end, where)</code>（结构化五元组出数）。本项目以 <code>ai_context()</code>（≈list+describe 合一）+
+  <code>query_metric()</code> 二合一实现同一契约。工程含义：<b>LLM 从"写 SQL 的程序员"降级为"填参数的分析员"</b>——
+  错误空间从无限（语法×口径×join）坍缩到有限（指标名×维度名×时间窗），且全部在编译层被确定性拦截。</div>
   <div class="co co-warn"><span class="cot">这不是一次现场 LLM 推理</span>
   以下五条链路由 <code>build.py</code> 在构建时预计算并落成 JSON 快照（<code>api/ai_demo.json</code>），
   用于演示<b>架构与口径流转</b>，页面上不会发生模型调用。真实接入形态是：同一份 <code>ai_context()</code> 注入 prompt →
@@ -57,7 +63,7 @@
 
   <h2 class="sec"><span class="no">4</span>AI 编程提效：这个站是怎么被建出来的</h2>
   <div class="co co-good"><span class="cot">不藏工具</span>
-  本项目（含 dbt 迁移、全套行级测试与守恒断言、七道门禁、新旧两版站点）由人定义口径与验收标准，
+  本项目（含 dbt 迁移、全套行级测试与守恒断言、八道门禁、新旧两版站点）由人定义口径与验收标准，
   AI 编程工具（ZCode / Claude Code / Cursor，即岗位 JD 点名的那类工具）结对完成实现。
   <b>分工是：AI 写代码，人签口径</b>——指标定义的每一行都是人拍板的，
   因为口径错误的代价不由工具承担，由开着数据会的业务承担。</div>

@@ -16,6 +16,7 @@ python build.py --fresh          # 模拟数据 → dbt(模型+行级测试) →
 python check.py --data           # 自检: 口径契约 / 前端×产物契约 / 跨文件一致性 / 数据侧失真
 python evidence.py               # 举证: 页面引用的数字能否从 out/api 复算(可核性)
 python northstar_eval.py         # 北极星评估: 预注册判据 + 三候选的相关/弹性, 落盘 northstar_evidence.json
+python golden.py                # 黄金查询集: 14 条业务问题→语义查询→断言(已知值/守恒/行为), 口径回归
 python compare_out.py            # 确认 out/ 已是 site/ 的最新产物(否则线上是旧页面)
 python verify_served.py          # 端到端: 断言发布页面里关键事实与北极星标注是否真的渲染出来
 python -m http.server 8898 --directory out   # 打开 http://127.0.0.1:8898
@@ -31,7 +32,7 @@ python -m streaming.replay       # 流批对账三口径重放(确定性, 守恒
 | 01 业务结构与数据域 | 6 个数据域（按业务过程切）+ 总线矩阵 + 5 组烟囱口径冲突案例 + 质量六维×测试映射 + 生命周期 |
 | 02 语义层构建 | 七步构建流程（每步有门禁）+ 19 个 spec 字段的事故清单 + 双口径争议治理 + 认证分级（规划） |
 | 03 指标体系与北极星 | 指标树（获取→激活→黏性→深度→变现）+ 护栏/反向指标 + 北极星审计与证伪条件 + 健康度盘点 |
-| 04 数据服务场景 | 6 个决策场景（问题→指标→口径陷阱→动作）+ 七道门禁↔生产监控对应物 |
+| 04 数据服务场景 | 6 个决策场景（问题→指标→口径陷阱→动作）+ 八道门禁↔生产监控对应物 |
 | 05 应用层 | 看板/目录/API 契约/静态交付四出口 + 权限与安全（现状诚实声明 + 生产做法） |
 | 06 AI 消费 | L1/L2/L3 + 五问完整链路 + 裸 Text2SQL 五类失败对照 + AI 编程提效（本项目怎么被建出来） |
 | 功能页 | [指标目录](https://dragonxu202610.github.io/metrichub/layer.html)（31 指标可展开试查）· [指标看板](https://dragonxu202610.github.io/metrichub/dashboard.html) · [dbt 血缘图](https://dragonxu202610.github.io/metrichub/dbt-docs/index.html) · [流批对账](https://dragonxu202610.github.io/metrichub/realtime.html) · [公开信源](https://dragonxu202610.github.io/metrichub/sources.html) |
@@ -108,7 +109,7 @@ metrichub/
 # 仓库 Settings → Pages → Source 选 GitHub Actions, push main 即发布; cron 每日重跑
 ```
 
-工作流每次 push 到 `main` 都会重放数据、跑 dbt 测试与七道门禁、发布快照。
+工作流每次 push 到 `main` 都会重放数据、跑 dbt 测试与八道门禁、发布快照。
 **锚点默认=构建当日**（每日 cron 让窗口真正前滚，站点不"变旧"）；需要逐字节复现某个历史构建时
 `python build.py --fresh --anchor 2026-10-08`。固定种子下锚点平移只平移日期标签、全部数值不变
 （页面结论不随每日重建失效）。数据均为模拟生成，仅作架构演示；业务设定的公开出处见站内「信源」页。

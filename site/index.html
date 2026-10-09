@@ -23,7 +23,7 @@
     <div class="stat"><div class="n">16</div><div class="l">dbt 模型（staging/DWD/DWS）</div></div>
     <div class="stat"><div class="n">__DBT_TEST_COUNT__</div><div class="l">dbt 节点：模型+行级测试+断言</div></div>
     <div class="stat"><div class="n">6</div><div class="l">数据域（按业务过程划分）</div></div>
-    <div class="stat"><div class="n">7</div><div class="l">交付门禁（不过不发布）</div></div>
+    <div class="stat"><div class="n">8</div><div class="l">交付门禁（不过不发布）</div></div>
     <div class="stat"><div class="n">11</div><div class="l">v2 页面（另含 v1 旧版归档）</div></div>
   </div>
 
@@ -116,7 +116,7 @@
       <g font-size="11.5" fill="#3c34ad" text-anchor="middle">
         <text x="120" y="318" font-weight="650">质量</text><text x="120" y="336" fill="#5f6875" font-size="10.5">六维 × 测试断言</text>
         <text x="285" y="318" font-weight="650">生命周期</text><text x="285" y="336" fill="#5f6875" font-size="10.5">分层保留 · 全量幂等重建</text>
-        <text x="450" y="318" font-weight="650">监控</text><text x="450" y="336" fill="#5f6875" font-size="10.5">七道门禁 = 发布前告警</text>
+        <text x="450" y="318" font-weight="650">监控</text><text x="450" y="336" fill="#5f6875" font-size="10.5">八道门禁 = 发布前告警</text>
         <text x="615" y="318" font-weight="650">元数据</text><text x="615" y="336" fill="#5f6875" font-size="10.5">spec 字段 + 血缘图</text>
         <text x="780" y="318" font-weight="650">安全</text><text x="780" y="336" fill="#5f6875" font-size="10.5">现状诚实声明 + 规划</text>
       </g>
@@ -143,7 +143,7 @@
     <a class="dcard" href="metrics.html" style="text-decoration:none"><div class="dh"><b>03 指标体系与北极星</b><span class="tg-plan">重构版</span></div>
       <ul><li>北极星指标树：获取→激活→黏性→深度→变现</li><li>护栏 + 反向指标：防「拉高北极星伤公司」</li><li>北极星审计结论与证伪条件</li><li>31 指标健康度盘点（孤儿/降级直说）</li></ul></a>
     <a class="dcard" href="services.html" style="text-decoration:none"><div class="dh"><b>04 数据服务场景</b><span class="tg-plan">重构版</span></div>
-      <ul><li>6 个决策场景：问题→指标→口径陷阱→动作</li><li>七道门禁 ↔ 生产监控对应物</li><li>可观测性四件套（规划）</li></ul></a>
+      <ul><li>6 个决策场景：问题→指标→口径陷阱→动作</li><li>八道门禁 ↔ 生产监控对应物</li><li>可观测性四件套（规划）</li></ul></a>
     <a class="dcard" href="apps.html" style="text-decoration:none"><div class="dh"><b>05 应用层</b><span class="tg-plan">重构版</span></div>
       <ul><li>看板 / 目录 / API 契约 / 静态交付</li><li>权限与安全：现状与生产做法</li></ul></a>
     <a class="dcard" href="ai.html" style="text-decoration:none"><div class="dh"><b>06 AI 问答 · Text2SQL · AI 开发</b><span class="tg-plan">重构版</span></div>
@@ -157,7 +157,7 @@
     <div class="vstep"><div class="vn">2</div><div class="vb"><div class="vt">查口径</div>
       <div class="vd"><a href="layer.html">指标目录</a>逐条展开口径公式、粒度、负责人、争议记录；<a href="dbt-docs/index.html">dbt 血缘图</a>可点开看表从哪来、测试挂在哪。</div></div></div>
     <div class="vstep"><div class="vn">3</div><div class="vb"><div class="vt">查数字</div>
-      <div class="vd">页面引用的每个数字由 <code>evidence.py</code> 从 <code>api/*.json</code> 复算，弹性论断绑定到具体日期对；七道门禁在 CI 里跑，不过不发布。</div></div></div>
+      <div class="vd">页面引用的每个数字由 <code>evidence.py</code> 从 <code>api/*.json</code> 复算，弹性论断绑定到具体日期对；14 条黄金查询锁定已知口径与报错行为；八道门禁在 CI 里跑，不过不发布。</div></div></div>
     <div class="vstep gate"><div class="vn">4</div><div class="vb"><div class="vt">查可复现</div>
       <div class="vd"><code>python build.py --fresh --anchor 2026-10-08</code> 可逐字节重放任何历史构建——固定种子下锚点平移只动日期标签，数值不变。</div></div></div>
   </div>

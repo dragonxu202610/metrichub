@@ -34,7 +34,7 @@
         (item.n ? '<span class="no">' + item.n + '</span>' : '') + item.t + '</a>';
     });
     html += '<div class="foot-note">数据为确定性模拟（固定种子 · 锚定可复现），' +
-      '业务设定的公开出处见「公开信源」。七道门禁不过不发布。</div>';
+      '业务设定的公开出处见「公开信源」。八道门禁不过不发布。</div>';
     side.innerHTML = html;
   }
 

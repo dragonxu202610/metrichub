@@ -251,18 +251,26 @@ def main():
     mtext2 = (rendered or pages).get("metrics.html", "")
     if mtext2 and cat is not None:
         import re as _re2
-        names = _re2.findall(r'<tr><td><code>([a-z][a-z0-9_]+)</code></td>', mtext2)
+        import yaml as _yaml3
+        src_types = {m["name"]: m.get("metric_type")
+                     for m in _yaml3.safe_load((ROOT / "metrics.yaml").read_text(encoding="utf-8"))["metrics"]}
+        rows = _re2.findall(r'<tr><td><code>([a-z][a-z0-9_]+)</code>(?: <span class="small">([a-z]+)</span>)?</td>', mtext2)
+        names = [n for n, _ in rows]
         known = {m["name"] for m in cat}
         ghost = sorted(set(n for n in names if n not in known))
         dups = sorted({n for n in names if names.count(n) > 1})
+        type_bad = [f"{n}页={ty}·YAML={src_types.get(n)}" for n, ty in rows
+                    if ty and src_types.get(n) != ty]
         if ghost:
             fail(f"指标体系分类表引用了不存在的指标: {ghost}")
         elif dups:
             fail(f"指标体系分类表存在重复行: {sorted(set(dups))}")
+        elif type_bad:
+            fail(f"指标体系分类表的 metric_type 标签与 YAML 声明不一致: {type_bad}")
         elif len(names) != len(cat):
             fail(f"指标体系分类表共 {len(names)} 行 != 目录 {len(cat)} 个指标 —— 漏分类或多分类")
         else:
-            ok(f"指标体系分类表 {len(names)} 行与目录一一对应(原子+计算全覆盖, 无幽灵指标)")
+            ok(f"指标体系分类表 {len(names)} 行与目录一一对应, metric_type 标签与 YAML 全部一致")
 
     print_report()
     return 1 if FAIL else 0

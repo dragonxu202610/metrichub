@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: dwd_event
+    description: |
+      粒度：1 行/页面浏览事件。ODS events 的直通落地（read_json_auto 类型只推断一次，
+      下游引用稳定 schema）。已知边界：仅日期无时刻、无 session/访客 ID。
+  - name: dwd_task
+    description: |
+      粒度：1 行/视频生成任务。模型毛利与北极星体系的事实底座。
+  - name: dwd_credits
+    description: |
+      粒度：1 行/积分台账变动（发放/消耗/订阅附赠）。已知缺陷：无资金来源字段（见 D5 粗糙点）。
+  - name: dwd_spend
+    description: |
+      粒度：1 行/渠道·日花费。仅 5 个有投放渠道，其余渠道 ROAS 分母由 nullif 保护为空。
+  - name: dwd_touch
+    description: |
+      粒度：1 行/注册前触点。线性归因的分母；已知缺陷：无时间戳与触点类型。

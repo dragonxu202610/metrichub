@@ -35,7 +35,7 @@
       <div class="vg">check.py · 北极星唯一性</div></div></div>
     <div class="vstep gate"><div class="vn">5</div><div class="vb"><div class="vt">门禁验证</div>
       <div class="vd">数据侧：序列非空、序列末点 ≈ 窗口聚合（容差 max(5%, 2pt)——拦"比率被逐日求和"）、ttfc 只剩 0/1440 即 FAIL（口径退化）、队列末点腰斩告警。</div>
-      <div class="vg">check.py --data · 七道门禁之一</div></div></div>
+      <div class="vg">check.py --data · 八道门禁之一</div></div></div>
     <div class="vstep gate"><div class="vn">6</div><div class="vb"><div class="vt">发布</div>
       <div class="vd">build → 静态站 + api/*.json。catalog 条数 = 源条数（产物过期 FAIL）；每指标 grain/series_grain 与定义一致；产物严格 JSON（parse_constant 拒绝 Infinity/NaN）。</div>
       <div class="vg">check.py · 前端×产物契约</div></div></div>
@@ -49,12 +49,14 @@
   <table class="tb">
     <tr><th style="width:150px">字段</th><th>含义</th><th>缺了会出的事故（本项目实例）</th><th style="width:150px">MF / Cube 对应</th></tr>
     <tr><td><code>name</code></td><td>唯一标识，AI 工具调用入口</td><td>重名 FAIL；非小写下划线 FAIL</td><td>metric / measure 名</td></tr>
+    <tr><td><code>metric_type</code></td><td>指标类型：simple(裸聚合)/filtered(带业务限定)/ratio(聚合÷聚合)/derived(含聚合间减法)/cumulative(滚动去重)</td><td>声明与 expr 结构不符即 FAIL（类型是 spec 的一部分，不是页面装饰）；与 MetricFlow 五类型学一一对应</td><td>metric type</td></tr>
+    <tr><td><code>status</code></td><td>认证分级：certified / proposed / deprecated</td><td>certified 须 owner+version 三证齐全（31 个指标当前全 certified）</td><td>certified 标记</td></tr>
     <tr><td><code>title</code> <code>desc</code></td><td>人话名称 + 口径描述，注入 AI 上下文</td><td>desc 写"排除测试账号"而无实现 → 告警"会被追问"</td><td>description</td></tr>
     <tr><td><code>group</code></td><td>6 业务域枚举（消费归属）</td><td>越出枚举 FAIL</td><td>Cube folders</td></tr>
     <tr><td><code>owner</code></td><td>指标责任人（必填）</td><td>无人对口径负责 → 争议无裁决人</td><td>git CODEOWNERS</td></tr>
     <tr><td><code>version</code></td><td>口径版本，变更必须 +1</td><td>paying_users v1→v3（含退款→只计非退款）：无版本则"口径漂移"不可追溯</td><td>靠 git，无内建字段</td></tr>
     <tr><td><code>basis</code></td><td>物理表，仅限 DWD/DWS 的 dbt 模型</td><td>语义层直捣业务库 → 绕过行级测试与守恒断言</td><td>semantic model 表来源</td></tr>
-    <tr><td><code>date_field</code></td><td>时间对齐列，默认 dt</td><td>新用户指标按事件 dt 取窗会把老用户算进"新注册"</td><td>time dimension</td></tr>
+    <tr><td><code>date_field</code></td><td><b>时间锚点</b>（每个指标声明自己的"今天"挂哪根时间轴：事件 dt / 注册 signup_dt / 订单日期）</td><td>时间锚点混用是月度趋势对不上的第一根因——下单/支付/退款各有各的轴，不声明就会混；新用户指标按事件 dt 取窗会把老用户算进"新注册"</td><td>type: time 的 dimension（agg_time_dimension）</td></tr>
     <tr><td><code>expr</code></td><td>聚合表达式，编译进 SELECT</td><td>ttfc 按日期相减只剩 0/1440 两值 → "分钟中位数"退化成布尔量（专项 FAIL）</td><td>measure agg + expr</td></tr>
     <tr><td><code>dimensions</code></td><td>可下钻白名单</td><td>引擎对非法维度<b>抛错而非静默丢弃</b>——静默 = 拿总值冒充分组值，"错了但看起来对"是最危险的失败模式</td><td>dimension / segment</td></tr>
     <tr><td><code>default_time</code></td><td>AI 未指明窗口时的默认值</td><td>隐式默认：有人以为 30d 有人以为 7d</td><td>查询参数</td></tr>
@@ -81,17 +83,19 @@
       <li><b>linear</b> $1,693——看助攻价值</li>
       <li>notes 显式记录：线性口径在演示数据上「不可用于预算决策」（40% 收入无归属）</li></ul></div>
   </div>
+  <p class="small" style="margin:6px 0 0">这与指标工程的经典反例同构：「客单价（按单）vs 人均消费（按人）——两个口径都对，但必须有两个名字，不能共用一个」。
+  双口径双名字、notes 互链，是同一条纪律。</p>
   <div class="co co-warn"><span class="cot">反例：什么时候不并存</span>
   model_gross_margin v2 强制现金口径（33.1% → 12.9%），因旧口径已被<b>证伪</b>（白送额度的燃烧记成收入）——
   这不是分歧而是错误，升版替换、notes 留痕即可追溯。<b>分歧并存，错误升版——两者的区别是治理判断，不是技术判断。</b></div>
 
-  <h2 class="sec"><span class="no">4</span>认证分级 <span class="tg-plan">规划</span></h2>
-  <p class="sec-sub">metrics.yaml 尚无指标级 status（north_star_status 的 approved/proposed/rejected 词汇可平移）。规划三级，门禁随之扩展：</p>
+  <h2 class="sec"><span class="no">4</span>认证分级 <span class="tg-ok">已实现 · 31 全 certified</span></h2>
+  <p class="sec-sub">metrics.yaml 的每条指标都声明 <code>status</code>，check.py 校验枚举与三证齐全；当前 31 个全部 certified（本演示没有未验证就上线的指标），proposed/deprecated 的流转由同一门禁兜底：</p>
   <table class="tb">
     <tr><th style="width:120px">级别</th><th>语义</th><th>门禁扩展</th></tr>
-    <tr><td><span class="tg-ok">certified</span></td><td>评审签约 + 数据侧验证通过，进看板/AI 默认目录</td><td>owner + notes + 数据侧三证齐全才可标注</td></tr>
-    <tr><td><span class="tg-plan">proposed</span></td><td>有定义、未过数据侧验证</td><td>ai_context 标"未认证，引用须声明"；不进看板默认 KPI</td></tr>
-    <tr><td><span class="tg-bad">deprecated</span></td><td>已被替代，记 successor</td><td>name 保留禁止复用（防历史报表复活旧口径）；校验 successor 存在</td></tr>
+    <tr><td><span class="tg-ok">certified</span></td><td>评审签约 + 数据侧验证通过，进看板/AI 默认目录</td><td>已实现：owner + version 三证齐全由 check.py 强制（当前 31/31）</td></tr>
+    <tr><td><span class="tg-plan">proposed</span></td><td>有定义、未过数据侧验证</td><td>机制已就位（枚举受门禁校验）；首次真实使用时启用 ai_context "未认证"标注</td></tr>
+    <tr><td><span class="tg-bad">deprecated</span></td><td>已被替代，记 successor</td><td>机制已就位；name 保留禁止复用（防历史报表复活旧口径）</td></tr>
   </table>
 
   <h2 class="sec"><span class="no">5</span>与 dbt 数仓层的分工边界</h2>
@@ -105,8 +109,18 @@
       <li>治理痕迹：notes + 北极星唯一性 + 承诺×实现检查</li>
       <li>互引：basis 只能指 dbt 模型；改口径需确认 dbt 测试仍守恒</li></ul></div>
   </div>
+  <div class="co co-note" style="margin-top:12px"><span class="cot">口径归属分层（隐性决策显式化）</span>
+  本项目的口径横跨两层：<b>分摊口径在 dbt 层</b>（dws_model_day 的"现金按积分占比分摊到模型"——需要跨表 join，单表引擎做不了）、
+  <b>比率口径在语义层</b>（expr 内的 ÷ 与 nullif）。这是自研引擎无实体图下的必然切分，不是疏忽；
+  生产演进方向是 MetricFlow 的 ratio/derived 指标把分摊口径<b>上收语义层</b>，dws 退化为缓存——
+  「物化是缓存，语义层仍是口径源」（语义层工程指南 §8 混合策略）。切分本身写进文档，是因为
+  <b>两层口径的变更流程不同</b>：dbt 层改分摊要走守恒断言，语义层改比率要走 golden 回归。</div>
 
   <h2 class="sec"><span class="no">6</span>能力边界诚实表</h2>
+  <p class="sec-sub">按编译理论的四条规则（语义层工程指南 §3）组织本引擎的能与不能：
+  <b>R1 路径解析</b>——非法维度抛错✓（白名单即路径）；<b>R2 跨事实维度可达</b>——不支持（无实体图，跨表靠 dbt 宽表）；
+  <b>R3 扇形膨胀</b>——单表聚合天然免疫（代价正是 R2）；<b>R4 时间对齐</b>——date_field 即时间锚点声明✓，
+  但无时间骨架（time spine），粒度转换/同期对比/空日补齐做不了。</p>
   <table class="tb">
     <tr><th style="width:210px">不支持</th><th>当前绕法</th><th style="width:230px">生产对应物</th></tr>
     <tr><td>派生 / 比率指标（指标间运算）</td><td>双聚合手写进单条 expr（creations_per_active_user）</td><td>MetricFlow derived/ratio metric</td></tr>
@@ -115,6 +129,25 @@
     <tr><td>行/列级权限</td><td>无（单租户演示，见<a href="apps.html">应用层</a>的治理落位）</td><td>Cube data access policies</td></tr>
     <tr><td>方言无关 SQL</td><td>expr 是 DuckDB 片段，换引擎即失效</td><td>编译到各方言</td></tr>
     <tr><td>实时出口 / MCP</td><td>AI 问答为构建时 JSON 快照（<a href="ai.html">AI 页</a>已标注）</td><td>Cube REST/GraphQL + MCP</td></tr>
+  </table>
+  <p class="tb-note">时间骨架的修法是 dim_date 日历表（连续无缺口），落地后解锁日→周→月粒度转换、YTD/同期对比与空日补齐——
+  当前演示窗口固定 14 天且数据自带全日历，故列为演进项。生态侧注记：Open Semantic Interchange（2025-09，Snowflake/Salesforce/dbt 发起）
+  与 MCP 正在把语义层从各家私有资产变为可流通资产——本项目的 YAML 结构即按"可被 OSI 描述"的形态组织。</p>
+
+  <h2 class="sec"><span class="no">7</span>验证体系：三道关</h2>
+  <p class="sec-sub">语义层的"可信"不靠承诺，靠三道互相咬合的关卡（构建方法论 S6；第三关的锚点前滚机制被语义层工程指南引为对账锚点留存的同源实践）：</p>
+  <table class="tb">
+    <tr><th style="width:150px">关卡</th><th>做什么</th><th style="width:210px">本项目实现</th></tr>
+    <tr><td><b>① 清单校验</b><br><span class="small">静态</span></td>
+      <td>语义清单 Σ 本身合法：字段/枚举/结构一致（metric_type 与 expr 匹配、certified 三证、北极星唯一）</td>
+      <td><code>check.py</code>（CI 门禁 2/8）</td></tr>
+    <tr><td><b>② 黄金查询集</b><br><span class="small">回归</span></td>
+      <td>14 条"业务问题→语义查询→断言"：已知值（4,278 / 48.1% / 12.9%…）+ 守恒（首触合计=现金 2,829）+ <b>行为断言</b>（非法维度、未注册窗口、逐日拆分拒绝必须报错）。
+      改任何口径后重跑，FAIL 条目=被改动的数字清单</td>
+      <td><code>golden.py</code>（CI 门禁 5/8，结果落盘 <a href="api/golden_results.json" target="_blank" rel="noopener">golden_results.json</a>）</td></tr>
+    <tr><td><b>③ 数值对账</b><br><span class="small">对外</span></td>
+      <td>页面每个数字从产物复算（弹性绑定日期对）、看板↔AI 同源、锚点可逐字节复现历史构建</td>
+      <td><code>evidence.py</code> + 编译同源 + <code>--anchor</code>（CI 门禁 3/8）</td></tr>
   </table>
 
   <div class="co co-note"><span class="cot">试一试</span>

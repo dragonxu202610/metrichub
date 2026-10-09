@@ -25,7 +25,9 @@
   <h2 class="sec"><span class="no">1</span>构建方法：原子指标 → 衍生指标 → 计算指标</h2>
   <p class="sec-sub">指标体系不是 31 条平铺的定义，而是一座三层金字塔：<b>原子指标</b>（事实表的裸聚合，不可再拆）→
   <b>衍生指标</b>（原子 + 时间周期 + 修饰词 + 统计粒度——"口径"就住在这一层）→ <b>计算指标</b>（指标÷指标、指标−指标的复合）。
-  本项目 31 个注册指标 = <b>14 原子 + 17 计算</b>，每个计算指标都能拆回原子血缘（见第 5、6 节）。</p>
+  本项目 31 个注册指标 = <b>14 原子 + 17 计算</b>，且每条都在 YAML 声明了更细的
+<b>metric_type</b>（simple 2 / filtered 11 / cumulative 1 / ratio 15 / derived 2——与 MetricFlow 五类型学对应，
+由 check.py 校验"声明与 expr 结构一致"）；每个计算指标都能拆回原子血缘（见第 5、6 节）。</p>
   <table class="tb">
     <tr><th style="width:110px">层</th><th>定义</th><th>本项目的实现形态</th><th style="width:74px">数量</th></tr>
     <tr><td><b>原子指标</b></td>
@@ -124,45 +126,46 @@
   <h3>原子指标 · 14 个 —— 全部上层指标的分子分母来源</h3>
   <table class="tb" id="tax-atom">
     <tr><th style="width:230px">指标</th><th style="width:150px">度量 · 事实表</th><th style="width:110px">时间周期</th><th>修饰词（业务限定）</th></tr>
-    <tr><td><code>weekly_successful_creations</code></td><td>计数 · dwd_task_ch</td><td>7d 窗口</td><td>成功任务</td></tr>
-    <tr><td><code>daily_successful_creations</code></td><td>计数 · dwd_task_ch</td><td>逐日</td><td>成功任务（上一行的日形态）</td></tr>
-    <tr><td><code>minutes_generated</code></td><td>秒数和÷60 · dwd_task</td><td>逐日</td><td>成功任务</td></tr>
-    <tr><td><code>weekly_minutes_generated</code></td><td>秒数和÷60 · dwd_task</td><td>7d 窗口</td><td>成功任务</td></tr>
-    <tr><td><code>active_creators</code></td><td>去重计数 · dwd_task_ch</td><td>7d 滚动去重</td><td>成功任务 · 北极星（逐日相加=人·天，禁止）</td></tr>
-    <tr><td><code>first_day_creations</code></td><td>计数 · dwd_user</td><td>注册当日</td><td>首日激活（activated_1d）的用户</td></tr>
-    <tr><td><code>new_users</code></td><td>计数 · dwd_user</td><td>逐日</td><td>注册事件</td></tr>
-    <tr><td><code>dau</code></td><td>去重计数 · dwd_event</td><td>逐日</td><td>页面事件（与成功生成口径组不同）</td></tr>
-    <tr><td><code>ttfc_median</code></td><td>中位数 · dwd_user</td><td>全窗单值</td><td>已 7d 激活的用户（分钟精度，防 0/1440 退化）</td></tr>
-    <tr><td><code>paying_users</code></td><td>去重计数 · dwd_order</td><td>窗口</td><td>非退款订单</td></tr>
-    <tr><td><code>revenue_daily</code></td><td>金额和 · dwd_order</td><td>逐日</td><td>非退款 —— <b>现金口径之锚</b>，毛利分母的唯一来源</td></tr>
-    <tr><td><code>channel_revenue_first_touch</code></td><td>金额和 · dwd_order</td><td>窗口</td><td>非退款 · 首触（按注册渠道归属）</td></tr>
-    <tr><td><code>channel_revenue_linear</code></td><td>金额和÷触点数 · dwd_order</td><td>窗口</td><td>非退款 · 线性权重(1/touch_cnt) —— 当前数据下不可用于预算决策</td></tr>
-    <tr><td><code>balance_capped_revenue_gap</code></td><td>行内差求和(秒−积分) · dwd_task</td><td>窗口</td><td>成功且余额封顶 —— "生成免单化"缺口</td></tr>
+    <tr><td><code>weekly_successful_creations</code> <span class="small">filtered</span></td><td>计数 · dwd_task_ch</td><td>7d 窗口</td><td>成功任务</td></tr>
+    <tr><td><code>daily_successful_creations</code> <span class="small">filtered</span></td><td>计数 · dwd_task_ch</td><td>逐日</td><td>成功任务（上一行的日形态）</td></tr>
+    <tr><td><code>minutes_generated</code> <span class="small">filtered</span></td><td>秒数和÷60 · dwd_task</td><td>逐日</td><td>成功任务</td></tr>
+    <tr><td><code>weekly_minutes_generated</code> <span class="small">filtered</span></td><td>秒数和÷60 · dwd_task</td><td>7d 窗口</td><td>成功任务</td></tr>
+    <tr><td><code>active_creators</code> <span class="small">cumulative</span></td><td>去重计数 · dwd_task_ch</td><td>7d 滚动去重</td><td>成功任务 · 北极星（逐日相加=人·天，禁止）</td></tr>
+    <tr><td><code>first_day_creations</code> <span class="small">filtered</span></td><td>计数 · dwd_user</td><td>注册当日</td><td>首日激活（activated_1d）的用户</td></tr>
+    <tr><td><code>new_users</code> <span class="small">simple</span></td><td>计数 · dwd_user</td><td>逐日</td><td>注册事件</td></tr>
+    <tr><td><code>dau</code> <span class="small">simple</span></td><td>去重计数 · dwd_event</td><td>逐日</td><td>页面事件（与成功生成口径组不同）</td></tr>
+    <tr><td><code>ttfc_median</code> <span class="small">filtered</span></td><td>中位数 · dwd_user</td><td>全窗单值</td><td>已 7d 激活的用户（分钟精度，防 0/1440 退化）</td></tr>
+    <tr><td><code>paying_users</code> <span class="small">filtered</span></td><td>去重计数 · dwd_order</td><td>窗口</td><td>非退款订单</td></tr>
+    <tr><td><code>revenue_daily</code> <span class="small">filtered</span></td><td>金额和 · dwd_order</td><td>逐日</td><td>非退款 —— <b>现金口径之锚</b>，毛利分母的唯一来源</td></tr>
+    <tr><td><code>channel_revenue_first_touch</code> <span class="small">filtered</span></td><td>金额和 · dwd_order</td><td>窗口</td><td>非退款 · 首触（按注册渠道归属）</td></tr>
+    <tr><td><code>channel_revenue_linear</code> <span class="small">filtered</span></td><td>金额和÷触点数 · dwd_order</td><td>窗口</td><td>非退款 · 线性权重(1/touch_cnt) —— 当前数据下不可用于预算决策</td></tr>
+    <tr><td><code>balance_capped_revenue_gap</code> <span class="small">filtered</span></td><td>行内差求和(秒−积分) · dwd_task</td><td>窗口</td><td>成功且余额封顶 —— "生成免单化"缺口</td></tr>
   </table>
 
   <h3>计算指标 · 17 个 —— 血缘与分母保护</h3>
   <table class="tb" id="tax-calc">
     <tr><th style="width:230px">指标</th><th style="width:150px">事实表</th><th style="width:100px">周期</th><th>计算式（拆回原子血缘）</th></tr>
-    <tr><td><code>creations_per_active_user</code></td><td>dwd_task_ch</td><td>7d</td><td>成功创作数 <b>÷</b> 活跃创作者数（同窗去重）—— 防"一人一条"</td></tr>
-    <tr><td><code>seo_signup_share</code></td><td>dwd_user</td><td>7d</td><td>SEO 渠道注册数 <b>÷</b> 总注册数</td></tr>
-    <tr><td><code>cac</code></td><td>dws_channel_roas</td><td>14d</td><td>渠道花费(D6) <b>÷</b> 该渠道新注册(D1) —— <b>跨数据域计算</b></td></tr>
-    <tr><td><code>activation_1d</code></td><td>dwd_user</td><td>注册 cohort</td><td>首日激活数 <b>÷</b> 注册数（队列成熟度已标注）</td></tr>
-    <tr><td><code>activation_7d</code></td><td>dwd_user</td><td>注册 cohort</td><td>7d 内激活数 <b>÷</b> 注册数 —— 与 1d 双口径并存</td></tr>
-    <tr><td><code>retention_d1</code></td><td>dwd_user</td><td>注册 cohort</td><td>严格次日活跃数 <b>÷</b> 注册数（次日当天，非无界滚动）</td></tr>
-    <tr><td><code>effect_penetration</code></td><td>dwd_event</td><td>逐日</td><td>特效页去重用户 <b>÷</b> 全站去重用户</td></tr>
-    <tr><td><code>payers_ratio</code></td><td>dwd_user</td><td>累计</td><td>ever_paid 用户 <b>÷</b> 全体用户（累计渗透，非窗口口径）</td></tr>
-    <tr><td><code>arppu</code></td><td>dwd_order</td><td>窗口</td><td>非退款现金 <b>÷</b> 付费用户数（nullif 保护）</td></tr>
-    <tr><td><code>free_credit_burn_rate</code></td><td>dwd_credits</td><td>7d</td><td>免费额度消耗 <b>÷</b> 免费发放（分母枚举写死，新增发放类型须显式登记）</td></tr>
-    <tr><td><code>paid_credit_burn_rate</code></td><td>dwd_credits</td><td>7d</td><td>积分总消耗 <b>÷</b> 付费发放 —— 大于100% 即口径警报（分子含免费消耗）</td></tr>
-    <tr><td><code>model_gross_margin</code></td><td>dws_model_day</td><td>14d</td><td>(分摊收入 − API成本) <b>÷</b> 分摊收入 —— 收入按积分占比分摊回现金</td></tr>
-    <tr><td><code>model_success_rate</code></td><td>dws_model_day</td><td>14d</td><td>成功调用 <b>÷</b> 总调用</td></tr>
-    <tr><td><code>roas</code></td><td>dws_channel_roas</td><td>14d</td><td>首触归因收入(D4) <b>÷</b> 渠道花费(D6) —— 跨域计算</td></tr>
-    <tr><td><code>payer_retention_wow</code></td><td>dws_payer_cohort</td><td>周环比快照</td><td>两周都付费 <b>÷</b> 上周付费（分子防"大于100% 吃掉坏消息"）</td></tr>
-    <tr><td><code>company_gross_margin</code></td><td>dws_company_day</td><td>14d</td><td>(全模型收入 − 全模型成本) <b>÷</b> 收入 —— 与 model 口径同构不分组</td></tr>
-    <tr><td><code>high_cost_exposure</code></td><td>dws_cost_tier_day</td><td>14d</td><td>高成本档成功任务 <b>÷</b> 全部成功任务（阈值 $0.03/s 为经验值）</td></tr>
+    <tr><td><code>creations_per_active_user</code> <span class="small">ratio</span></td><td>dwd_task_ch</td><td>7d</td><td>成功创作数 <b>÷</b> 活跃创作者数（同窗去重）—— 防"一人一条"</td></tr>
+    <tr><td><code>seo_signup_share</code> <span class="small">ratio</span></td><td>dwd_user</td><td>7d</td><td>SEO 渠道注册数 <b>÷</b> 总注册数</td></tr>
+    <tr><td><code>cac</code> <span class="small">ratio</span></td><td>dws_channel_roas</td><td>14d</td><td>渠道花费(D6) <b>÷</b> 该渠道新注册(D1) —— <b>跨数据域计算</b></td></tr>
+    <tr><td><code>activation_1d</code> <span class="small">ratio</span></td><td>dwd_user</td><td>注册 cohort</td><td>首日激活数 <b>÷</b> 注册数（队列成熟度已标注）</td></tr>
+    <tr><td><code>activation_7d</code> <span class="small">ratio</span></td><td>dwd_user</td><td>注册 cohort</td><td>7d 内激活数 <b>÷</b> 注册数 —— 与 1d 双口径并存</td></tr>
+    <tr><td><code>retention_d1</code> <span class="small">ratio</span></td><td>dwd_user</td><td>注册 cohort</td><td>严格次日活跃数 <b>÷</b> 注册数（次日当天，非无界滚动）</td></tr>
+    <tr><td><code>effect_penetration</code> <span class="small">ratio</span></td><td>dwd_event</td><td>逐日</td><td>特效页去重用户 <b>÷</b> 全站去重用户</td></tr>
+    <tr><td><code>payers_ratio</code> <span class="small">ratio</span></td><td>dwd_user</td><td>累计</td><td>ever_paid 用户 <b>÷</b> 全体用户（累计渗透，非窗口口径）</td></tr>
+    <tr><td><code>arppu</code> <span class="small">ratio</span></td><td>dwd_order</td><td>窗口</td><td>非退款现金 <b>÷</b> 付费用户数（nullif 保护）</td></tr>
+    <tr><td><code>free_credit_burn_rate</code> <span class="small">ratio</span></td><td>dwd_credits</td><td>7d</td><td>免费额度消耗 <b>÷</b> 免费发放（分母枚举写死，新增发放类型须显式登记）</td></tr>
+    <tr><td><code>paid_credit_burn_rate</code> <span class="small">ratio</span></td><td>dwd_credits</td><td>7d</td><td>积分总消耗 <b>÷</b> 付费发放 —— 大于100% 即口径警报（分子含免费消耗）</td></tr>
+    <tr><td><code>model_gross_margin</code> <span class="small">derived</span></td><td>dws_model_day</td><td>14d</td><td>(分摊收入 − API成本) <b>÷</b> 分摊收入 —— 收入按积分占比分摊回现金</td></tr>
+    <tr><td><code>model_success_rate</code> <span class="small">ratio</span></td><td>dws_model_day</td><td>14d</td><td>成功调用 <b>÷</b> 总调用</td></tr>
+    <tr><td><code>roas</code> <span class="small">ratio</span></td><td>dws_channel_roas</td><td>14d</td><td>首触归因收入(D4) <b>÷</b> 渠道花费(D6) —— 跨域计算</td></tr>
+    <tr><td><code>payer_retention_wow</code> <span class="small">ratio</span></td><td>dws_payer_cohort</td><td>周环比快照</td><td>两周都付费 <b>÷</b> 上周付费（分子防"大于100% 吃掉坏消息"）</td></tr>
+    <tr><td><code>company_gross_margin</code> <span class="small">derived</span></td><td>dws_company_day</td><td>14d</td><td>(全模型收入 − 全模型成本) <b>÷</b> 收入 —— 与 model 口径同构不分组</td></tr>
+    <tr><td><code>high_cost_exposure</code> <span class="small">ratio</span></td><td>dws_cost_tier_day</td><td>14d</td><td>高成本档成功任务 <b>÷</b> 全部成功任务（阈值 $0.03/s 为经验值）</td></tr>
   </table>
   <p class="tb-note">注：原子/计算之别按"expr 是否含聚合间运算"判定（如 minutes_generated 的 ÷60 是单位换算，不改原子性；
-  channel_revenue_linear 的 ÷touch_cnt 是行内权重，属修饰词）。两表行数 14+17=31，与目录一一对应。</p>
+  channel_revenue_linear 的 ÷touch_cnt 是行内权重，属修饰词）。两表行数 14+17=31，与目录一一对应；
+  每行的 metric_type 标签与 metrics.yaml 声明同源（check.py 校验结构与声明一致，evidence 校验页面与 YAML 一致）。</p>
 
   <h2 class="sec"><span class="no">6</span>指标关系：四条计算链（谁是谁的分子分母）</h2>
   <p class="sec-sub">计算指标的血缘不是文档修辞——改一个原子口径，下游整条链的数字都要重算。
@@ -364,6 +367,11 @@
       <td>free_credit_burn_rate 默认 7d 窗口值 <b class="num">76.6%</b>（&lt;55% 告警；notes 记录的 14d 逐日历史区间 57.6~81.8%）+ paid_credit_burn_rate 默认 7d 窗口值 <b class="num" style="color:var(--bad)">125.6%——大于 100% 本身就是口径警报</b>：分子含免费消耗（台账无资金来源字段，见<a href="domains.html">D5 粗糙点</a>），这正是"只能换分母、不拆分子"限制的直观体现</td></tr>
     <tr><td>深度创作者占比</td><td><span class="tg-bad">无</span></td><td>deep_creator_share <span class="tg-plan">规划</span>：防「尝鲜撑起北极星」，即审计推翻条件 R2 的观测项</td></tr>
   </table>
+
+  <div class="co co-note" style="margin-top:12px"><span class="cot">通则：比率 &gt; 100% 几乎总是口径/边界警报</span>
+  语义层工程指南的实测案例：跨月退款按各自时间锚点对齐后，边界月份会出现"退款率 105.3%"的<b>残缺桶</b>（分子含上月下单、分母只含本月）。
+  本项目的付费燃烧率 125.6% 与之同构而根因不同——它是分子混入了免费消耗（台账无资金来源）。
+  现象一样、病根两样，但<b>处置相同：比率超 100% 必须停下来查口径，而不是截个图发群里</b>。该已知现象已锁进黄金查询 G10。</div>
 
   <h2 class="sec"><span class="no">11</span>分域 KPI 视图：各域盯什么，坏了说明什么</h2>
   <table class="tb">

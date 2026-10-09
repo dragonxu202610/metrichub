@@ -69,6 +69,28 @@ def check_metrics_yaml():
             fail(f"{n}: 命名不合规(小写下划线)")
         if m.get("group") not in groups:
             fail(f"{n}: group={m.get('group')} 不在 {sorted(groups)}")
+        # 指标类型(metric_type): 声明值必须与 expr 结构一致 —— 类型是 spec 的一部分而非页面装饰。
+        # 推断规则与指标体系页分类一致: 行内运算(权重÷/行内−/单位换算÷60)不改类型。
+        MT = {"simple", "filtered", "ratio", "derived", "cumulative"}
+        if m.get("metric_type") not in MT:
+            fail(f"{n}: metric_type={m.get('metric_type')} 不合法 {sorted(MT)}")
+        else:
+            import re as _re
+            e = _re.sub(r"\w+ / \w+(?=[,)])", "X", m["expr"])      # 行内除法(如 amount/touch_cnt 权重)
+            e = _re.sub(r"\w+ - \w+(?=[,)])", "X", e)              # 行内减法(如 seconds-credits)
+            e = e.replace("/ 60.0", "")                              # 秒→分钟单位换算
+            infer = "cumulative" if m.get("rolling_distinct_on") else (
+                "derived" if ("/" in e and _re.search(r"\)\s*-\s*(sum|count|round)\(", e)) else
+                "ratio" if "/" in e else
+                "filtered" if "FILTER" in e.upper() else "simple")
+            if m["metric_type"] != infer:
+                fail(f"{n}: metric_type={m['metric_type']} 与 expr 结构不符(按结构应={infer}) —— 类型声明漂移")
+        # 认证分级(status): certified 须三证齐全(owner/version/已注册即过数据侧门禁)
+        ST = {"certified", "proposed", "deprecated"}
+        if m.get("status") not in ST:
+            fail(f"{n}: status={m.get('status')} 不合法 {sorted(ST)}(未声明视为不认证)")
+        elif m["status"] == "certified" and not (m.get("owner") and m.get("version")):
+            fail(f"{n}: status=certified 但缺 owner/version —— 认证须三证齐全")
         if m.get("default_time") not in windows:
             fail(f"{n}: default_time={m.get('default_time')} 不在 {sorted(windows)}")
         # unit 是注入 AI 上下文的字段, 必须能表达"倍数"类指标(如 ROAS = 收入/花费, 不是美元)
@@ -91,7 +113,10 @@ def check_metrics_yaml():
             if re.search(rf"\b{fn}\s*\(", m.get("expr", "")):
                 warn(f"{n}: expr 使用 {fn}() —— 与 FILTER 组合时易静默退化, "
                      f"确认 {m['basis']} 里有该列且语义是'毫秒/分钟'而非被截断的日期差")
-    ok(f"口径契约字段检查完成({len(metrics)} 个指标, 均声明 grain)")
+    from collections import Counter as _C
+    _types = dict(_C(m.get("metric_type", "?") for m in metrics))
+    ok(f"口径契约字段检查完成({len(metrics)} 个指标, 均声明 grain; "
+       f"metric_type 全部与 expr 结构一致: {_types}; status 全部合法)")
     # 北极星唯一性: 不该让人翻五个文件才搞清"总分是哪一格"
     north = [m["name"] for m in metrics if m.get("north_star_status")]
     approved = [m["name"] for m in metrics if m.get("north_star_status") == "approved"]
@@ -375,6 +400,22 @@ def check_cross_file(metrics):
                  f"裸 dbt run 会用错窗口")
         else:
             ok(f"dbt 默认锚定日期钉在参考复现锚({dbt_anchor})")
+    # dbt 模型粒度声明全覆盖(S3 纪律): 每个模型 description 必须以"粒度："开头 ——
+    # "一行=什么"是事实表的合同, 缺了它增量/去重/测试都无从谈起。
+    try:
+        import yaml as _yaml2
+        n_models = 0
+        for sf in sorted((ROOT / "dbt" / "models").glob("*/schema.yml")):
+            for mm in _yaml2.safe_load(sf.read_text(encoding="utf-8")).get("models", []):
+                n_models += 1
+                if not str(mm.get("description", "")).lstrip().startswith("粒度："):
+                    fail(f"dbt 模型 {mm['name']} 缺粒度声明(description 应以『粒度：』开头)")
+        if n_models and n_models != 16:
+            warn(f"dbt 粒度校验覆盖 {n_models} 个模型(预期 16) —— 模型增删后请同步本断言")
+        elif n_models == 16:
+            ok("dbt 16 个模型粒度声明全覆盖(一行=什么)")
+    except Exception as e:                                       # noqa: BLE001
+        warn(f"无法校验 dbt 粒度声明({e})")
     # 口径描述里的"承诺词"必须有对应实现, 或在 notes 里明确承认未实现
     promises = {"排除测试账号": ("test", "is_test", "NOT is_test"),
                 "仅对有花费的渠道": ("spend", "cac"),
