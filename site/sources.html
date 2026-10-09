@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公开信源 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .src-table{width:100%;border-collapse:collapse;font-size:12.8px;background:var(--card)}
+  .src-table th{font-size:11.5px;letter-spacing:1px;color:var(--muted);text-align:left;
+                border-bottom:2px solid var(--line);padding:8px 10px;white-space:nowrap}
+  .src-table td{border-bottom:1px solid var(--line);padding:9px 10px;vertical-align:top}
+  .src-table td b{font-size:12.8px}
+  .src-table .v{font-family:var(--mono);font-size:11.8px}
+  .tag.fact{background:var(--good-wash);color:var(--good)}
+  .tag.infer{background:var(--accent-wash);color:var(--accent-deep)}
+  .tag.est{background:var(--amber-wash);color:var(--amber)}
+  .tag.hyp{background:#f0eee8;color:var(--muted)}
+  .srclist li{margin:6px 0;font-size:12.6px}
+  .xcheck{border:1px solid #e0cfa4;background:#fdf8ec;border-radius:10px;padding:14px 18px;margin:16px 0}
+</style>
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item" href="index.html">总览</a>
+  <a class="item" href="business.html">业务解构</a>
+  <a class="item" href="northstar.html">北极星审计</a>
+  <a class="item" href="dashboard.html">看板</a>
+  <a class="item" href="layer.html">语义层</a>
+  <a class="item" href="ai.html">AI 问答</a>
+  <a class="item on" href="sources.html">信源</a>
+</div></nav>
+<main>
+  <div class="hero" style="padding-bottom:0">
+    <h1>公开信源</h1>
+    <p class="lead">本站是<b>为 Pollo.ai（深圳九瓴科技）数据开发岗制作的求职演示</b>，不含任何内部数据。
+    业务画像的每一条设定要么有公开出处（可点开核对），要么显式标注为推断/估算/假设——
+    「基于公开信息」这六个字必须能被逐条验证，否则就只是一句宣传语。</p>
+    <p class="lead" style="font-size:13px">所有<b>数据</b>均为确定性模拟（固定随机种子），用于演示指标口径与治理机制，
+    不代表该公司真实经营数字；本页只负责回答「业务设定从哪来」。</p>
+  </div>
+
+  <h2>业务设定 × 公开出处</h2>
+  <table class="src-table">
+    <tr><th>业务设定</th><th>本站取值</th><th>公开出处</th><th>性质</th></tr>
+    <tr>
+      <td><b>公司主体与团队</b></td>
+      <td class="v">深圳九瓴科技（研发·宝安）/ 总部新加坡，团队约 100 人</td>
+      <td>猎聘公司主页；晚点报道</td>
+      <td><span class="tag fact">事实</span></td>
+    </tr>
+    <tr>
+      <td><b>产品形态</b></td>
+      <td class="v">多模型聚合的一站式 AI 视频平台（「视频版 Poe」），不自研模型</td>
+      <td>晚点报道；创始人专访</td>
+      <td><span class="tag fact">事实</span></td>
+    </tr>
+    <tr>
+      <td><b>模型阵容</b></td>
+      <td class="v">取 8 个市售代表模型：PixVerse V5 · Wan 2.5 · Vidu Q2 · Hailuo 02 · Kling 2.5 · Runway Gen-4 · Sora 2 · Veo 3.1</td>
+      <td>晚点（以可灵内测 API 起家）；专访（可灵/Runway/Sora/海螺等）；官网模型页</td>
+      <td><span class="tag fact">事实</span><br><span style="font-size:11px;color:var(--muted)">清单为本站选取的代表集</span></td>
+    </tr>
+    <tr>
+      <td><b>融资</b></td>
+      <td class="v">$1400 万种子轮（2025.12）</td>
+      <td>晚点报道（新浪转载）；The SaaS News 英文报道</td>
+      <td><span class="tag fact">事实</span><br><span style="font-size:11px;color:var(--muted)">投资方两源不一致，见下方交叉核验</span></td>
+    </tr>
+    <tr>
+      <td><b>经营规模</b></td>
+      <td class="v">注册 2000 万+ · MAU 600 万+ · DAU 20 万+ · ARR $2000 万+ · 2025.5 盈亏平衡</td>
+      <td>晚点报道</td>
+      <td><span class="tag fact">事实</span></td>
+    </tr>
+    <tr>
+      <td><b>获客结构</b></td>
+      <td class="v">SEO 起家 + 红人营销 + 付费投放「三板斧」；创始人 SEO 出身（前万兴科技）；自述 SEO 见顶、转向产品驱动</td>
+      <td>晚点报道；创始人专访</td>
+      <td><span class="tag fact">事实</span></td>
+    </tr>
+    <tr>
+      <td><b>渠道清单（9 条）</b></td>
+      <td class="v">google/bing/reddit-organic · influencer-tiktok/youtube · google-ads/facebook-ads · affiliate · direct</td>
+      <td>由上述「三板斧」做的结构化展开</td>
+      <td><span class="tag infer">推断</span></td>
+    </tr>
+    <tr>
+      <td><b>订阅定价</b></td>
+      <td class="v">lite $15/月（300 积分） · pro $29/月（800 积分）</td>
+      <td><a href="https://pollo.ai/pricing" target="_blank" rel="noopener">pollo.ai/pricing</a> 官网定价页</td>
+      <td><span class="tag fact">事实</span><br><span style="font-size:11px;color:var(--muted)">取值近似，用于演示量级</span></td>
+    </tr>
+    <tr>
+      <td><b>模型成本 $/秒</b></td>
+      <td class="v">如 Veo 3.1 $0.048/s · PixVerse V5 $0.006/s（8 档全表见看板）</td>
+      <td>各厂商官网 API 定价页折算（2026-10 时点）</td>
+      <td><span class="tag est">估算</span><br><span style="font-size:11px;color:var(--muted)">演示相对高低与量级，非精确核算</span></td>
+    </tr>
+    <tr>
+      <td><b>行为参数</b></td>
+      <td class="v">留存衰减、付费率（3%–6% 按渠道）、转化延迟等</td>
+      <td>无公开信息，为让指标体系可演示所做的假设</td>
+      <td><span class="tag hyp">假设</span></td>
+    </tr>
+  </table>
+
+  <div class="xcheck">
+    <b>交叉核验记录（源间矛盾不藏起来）</b>
+    <p style="font-size:12.6px;margin:8px 0 0;color:var(--muted)">
+    融资领投方：晚点原文写<b>「高成资本」领投</b>；The SaaS News 英文报道写 <b>Gaorong Capital</b>（若直译为「高榕」），
+    两源不一致。本站采信晚点（中文一手信源、采访更完整），同时在下方保留两个出处供独立核验——
+    指标口径要单一事实源，<b>信源矛盾的处置方式本身也该被记录</b>，这与语义层里「口径争议写进 notes」是同一条纪律。</p>
+  </div>
+
+  <h2>出处清单</h2>
+  <ul class="srclist">
+    <li>① 晚点 LatePost 独家（新浪财经转载，2025-12-05）：<a href="https://finance.sina.com.cn/roll/2025-12-05/doc-infztink7888857.shtml" target="_blank" rel="noopener">视频生成产品 Pollo AI 获 1400 万美元融资</a> —— 融资/用户规模/ARR/创始人背景/获客方式的主要信源</li>
+    <li>② The SaaS News（2025-12-09）：<a href="https://www.thesaasnews.com/news/pollo-ai-raises-14-million-in-seed-round/" target="_blank" rel="noopener">Pollo AI Raises $14 Million in Seed Round</a> —— 英文侧佐证</li>
+    <li>③ 猎聘 · 深圳九瓴科技有限公司主页：<a href="https://www.liepin.com/company/21291101/" target="_blank" rel="noopener">公司介绍与在招岗位</a> —— 主体/规模/地点/在招数据岗</li>
+    <li>④ 创始人专访（AI-bot 转载）：<a href="https://ai-bot.cn/ai-column-pollo-ai/" target="_blank" rel="noopener">Pollo AI 创始人对谈</a> —— 产品形态/模型阵容/增长三板斧</li>
+    <li>⑤ Pollo.ai 官网：<a href="https://pollo.ai/" target="_blank" rel="noopener">首页</a> · <a href="https://pollo.ai/pricing" target="_blank" rel="noopener">定价页</a> —— 套餐与积分定价</li>
+    <li>⑥ 各模型厂商官网定价页（2026-10 时点）：Google Veo / OpenAI Sora / 快手可灵 / Runway / MiniMax 海螺 / Vidu / 阿里 Wan / PixVerse —— $/秒成本估算的折算依据</li>
+  </ul>
+
+  <footer>
+    <span>MetricHub · 信源可指认 —— 事实(有源)/推断(标注)/估算(注明时点)/假设(声明无据)</span>
+    <span><a href="business.html">这些设定如何进入业务解构 →</a></span>
+  </footer>
+</main>
+</body>
+</html>
