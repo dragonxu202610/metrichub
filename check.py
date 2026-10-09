@@ -305,19 +305,31 @@ def check_cross_file(metrics):
         simulator = None
     if simulator:
         sim_models = {m[0] for m in simulator.MODELS}
-        src = (ROOT / "build.py").read_text(encoding="utf-8")
-        # 单价现在只在 dim_model_cost 维表里写一遍(此前 CASE 与模拟器重复, 属于会漂移的重复)
-        cost_block = re.search(r"dim_model_cost AS\s*SELECT \* FROM \(VALUES(.*?)\) AS t", src, re.S)
-        if cost_block:
-            cost_models = set(re.findall(r"\('([^']+)'", cost_block.group(1)))
+        # 单价现在只在 dbt seed(dbt/seeds/dim_model_cost.csv)里写一遍
+        # (此前 CASE 与模拟器重复, 属于会漂移的重复; 更早在 build.py 的 VALUES 里)
+        seed = ROOT / "dbt" / "seeds" / "dim_model_cost.csv"
+        if not seed.exists():
+            fail("dbt/seeds/dim_model_cost.csv 不存在 —— 定价的单一来源缺失")
+        else:
+            import csv
+            with open(seed, encoding="utf-8") as f:
+                cost_models = {row["model"] for row in csv.DictReader(f) if row.get("model")}
             if cost_models != sim_models:
-                fail(f"dim_model_cost 与模拟器模型清单不一致: "
+                fail(f"dim_model_cost seed 与模拟器模型清单不一致: "
                      f"仅模拟器有 {sorted(sim_models - cost_models)}, "
                      f"仅维表有 {sorted(cost_models - sim_models)}")
             else:
-                ok(f"dim_model_cost 覆盖全部 {len(sim_models)} 个模型")
+                ok(f"dim_model_cost seed 覆盖全部 {len(sim_models)} 个模型")
+        # 锚定日期的 dbt 默认值必须与模拟器一致: build.py 每次会用 --vars 覆盖,
+        # 但默认值漂移意味着"不传参的裸 dbt run"会算出另一个窗口的口径 —— 必须断言兜住。
+        import yaml as _yaml
+        proj = _yaml.safe_load((ROOT / "dbt" / "dbt_project.yml").read_text(encoding="utf-8"))
+        dbt_anchor = str((proj.get("vars") or {}).get("anchor_date", ""))
+        if dbt_anchor != simulator.ANCHOR.isoformat():
+            fail(f"dbt_project.yml 的 anchor_date={dbt_anchor!r} 与 simulator.ANCHOR="
+                 f"{simulator.ANCHOR} 不一致 —— 裸 dbt run 会算出错窗口的口径")
         else:
-            fail("build.py 里找不到 dim_model_cost 维表 —— 定价的单一来源缺失")
+            ok(f"dbt 默认锚定日期与 simulator.ANCHOR 一致({dbt_anchor})")
     # 口径描述里的"承诺词"必须有对应实现, 或在 notes 里明确承认未实现
     promises = {"排除测试账号": ("test", "is_test", "NOT is_test"),
                 "仅对有花费的渠道": ("spend", "cac"),

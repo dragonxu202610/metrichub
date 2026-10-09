@@ -1,0 +1,36 @@
+# MetricHub 数仓层(dbt)
+# 分层: source(ODS/外部JSONL) → 01_staging(直通落地) → 02_dwd(明细宽表) → 03_dws(汇总)
+# 表名与旧 ELT(build.py 内联 SQL)完全一致 —— 语义层 metrics.yaml 的 basis 零改动。
+name: metrichub
+version: "1.0.0"
+profile: metrichub
+
+# 锚定日期的默认值: 真值来自 simulator.ANCHOR, build.py 每次构建用 --vars 显式传入;
+# 这里只留一个与 simulator 同步的默认, check.py 会断言两者不漂移。
+# 它取代了旧 build.py 里 "ELT.replace('current_date', ...)" 的字符串替换 ——
+# 口径参数显式进模型, 而不是跑前偷偷改 SQL 文本。
+vars:
+  anchor_date: "2026-10-08"
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  metrichub:
+    # 全部物化为 table: 与旧 CREATE OR REPLACE TABLE 等价, 语义层直接查物理表。
+    # 不用 view/incremental —— 演示窗口固定 14 天, 全量重建即幂等(见 README 的取舍记录)。
+    +materialized: table
+
+seeds:
+  metrichub:
+    +quote-columns: false
+    dim_model_cost:
+      # 列类型必须钉死为 DECIMAL(4,3): 与旧 VALUES 字面量推断的类型一致。
+      # 若让 dbt 自动推断成 DOUBLE, 乘法的浮点误差会让 round(...,2) 在边界翻面,
+      # "迁移前后产物逐字节一致"的验收就破了 —— 这是等价迁移里最隐蔽的一处类型坑。
+      +column_types:
+        model: varchar
+        api_cost_s: DECIMAL(4,3)

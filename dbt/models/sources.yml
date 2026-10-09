@@ -1,0 +1,99 @@
+# ODS 层: 模拟器直出的 JSONL, 经 read_json_auto 以外部源形式挂进 dbt。
+# 只记事实不加工(加工是 DWD/DWS 的职责) —— 与旧 ELT 的 read_json_auto 完全同源。
+version: 2
+
+sources:
+  - name: raw
+    description: 模拟器(data/*.jsonl)的 7 张原始事实表, 确定性生成(SEED=20261008, 锚定 2026-10-08)
+    meta:
+      external_location: "read_json_auto('data/{name}.jsonl')"
+    tables:
+      - name: users
+        description: 用户注册事实(渠道/国家/平台/付费倾向)
+        columns:
+          - name: user_id
+            description: 用户唯一标识, 全链路主键
+            tests: [not_null, unique]
+          - name: channel
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ["google-organic", "bing-organic", "reddit-organic",
+                           "influencer-tiktok", "influencer-youtube", "google-ads",
+                           "facebook-ads", "affiliate", "direct"]
+          - name: channel_type
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [seo, influencer, paid, affiliate, direct]
+      - name: events
+        description: 页面浏览事件
+        columns:
+          - name: user_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source("raw", "users")
+                  field: user_id
+      - name: tasks
+        description: 视频生成任务(模型/成败/秒数/积分)
+        columns:
+          - name: user_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source("raw", "users")
+                  field: user_id
+          - name: model
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ["PixVerse V5", "Wan 2.5", "Vidu Q2", "Hailuo 02",
+                           "Kling 2.5", "Runway Gen-4", "Sora 2", "Veo 3.1"]
+          - name: success
+            tests:
+              - not_null
+      - name: orders
+        description: 订单(套餐/金额/退款标志)
+        columns:
+          - name: user_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source("raw", "users")
+                  field: user_id
+          - name: plan
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [lite, pro]
+          - name: refund
+            tests:
+              - not_null
+      - name: credits
+        description: 积分台账(发放/消耗/订阅)
+        columns:
+          - name: user_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source("raw", "users")
+                  field: user_id
+      - name: spend
+        description: 渠道日花费(仅付费/联盟渠道有投放)
+        columns:
+          - name: channel
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ["influencer-tiktok", "influencer-youtube",
+                           "google-ads", "facebook-ads", "affiliate"]
+      - name: touch
+        description: 注册前触点(线性归因分母), 已知缺陷——无时间戳
+        columns:
+          - name: user_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source("raw", "users")
+                  field: user_id

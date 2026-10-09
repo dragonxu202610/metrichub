@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install duckdb pyyaml
+      - run: pip install duckdb pyyaml dbt-core dbt-duckdb
       - run: python build.py --fresh
       # 可信度门禁: 自检不过就不发布 —— "可信"必须是流水线的硬约束, 不是本地习惯
       - run: python check.py --data

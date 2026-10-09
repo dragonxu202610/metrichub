@@ -1,0 +1,17 @@
+# dbt-duckdb 连接配置(随仓库提交, 用 --profiles-dir dbt 显式指定)
+# 运行目录约定: 一律从仓库根目录调用(build.py / CI 都遵守), 相对路径才成立。
+metrichub:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: data/metrichub.duckdb
+      schema: main
+      # 两处 threads 都钉死为 1, 各管一层确定性:
+      #   外层 threads: dbt 的模型构建并发。1 = 构建顺序固定, 同一次 build 的产物可复现。
+      #   settings.threads: DuckDB 的查询执行并发。1 = 浮点求和顺序固定 ——
+      #     并行 hash 聚合的浮点加法不满足结合律, round(...,1) 会在边界上抖(-8.6/-8.7 实测翻过)。
+      # 这是把旧 build.py 的 "SET threads TO 1" 原样搬进来: 字节级可复现是本项目的硬约束。
+      threads: 1
+      settings:
+        threads: 1

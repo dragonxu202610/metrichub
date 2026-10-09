@@ -1,0 +1,92 @@
+version: 2
+
+models:
+  - name: dws_cash_day
+    description: 当期实收现金(非退款) —— 收入口径的锚, 毛利分母的唯一来源
+    columns:
+      - name: dt
+        tests: [not_null, unique]
+      - name: cash_usd
+        tests: [not_null]
+
+  - name: dws_model_day
+    description: 模型日汇总(毛利 basis)——成本=成功秒×单价, 收入=现金按积分占比分摊
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: model
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_model_cost')
+              field: model
+      - name: revenue_usd
+        tests: [not_null]
+      - name: api_cost_usd
+        tests: [not_null]
+
+  - name: dws_channel_day
+    description: 渠道日表(花费 × 新增注册)
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+      - name: spend
+        tests: [not_null]
+      - name: new_users
+        tests: [not_null]
+
+  - name: dws_channel_attr
+    description: 首触归因收入(订单按注册渠道归属)
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+
+  - name: dws_channel_roas
+    description: ROAS 视图(收入归因 + 花费对齐)
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+      - name: spend
+        tests: [not_null]
+      - name: revenue_attr
+        tests: [not_null]
+
+  - name: dws_company_day
+    description: 公司级毛利日表(CEO 视角)
+    columns:
+      - name: dt
+        tests: [not_null, unique]
+      - name: revenue_usd
+        tests: [not_null]
+      - name: api_cost_usd
+        tests: [not_null]
+
+  - name: dws_cost_tier_day
+    description: 高成本档任务占比(经验阈值 $0.03/秒)
+    columns:
+      - name: dt
+        tests: [not_null, unique]
+      - name: success_high_cost
+        tests: [not_null]
+      - name: success_low_cost
+        tests: [not_null]
+
+  - name: dws_payer_cohort
+    description: 付费留存周环比快照(按套餐分列)
+    columns:
+      - name: plan
+        tests:
+          - not_null
+          - accepted_values:
+              values: [lite, pro]
+      - name: retained
+        description: 分子必须是"两周都付费"的用户 —— 护栏指标最怕把坏消息吃掉
+        tests: [not_null]
+      - name: prev_payers
+        tests: [not_null]

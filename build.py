@@ -2,10 +2,10 @@
 """
 MetricHub 一键构建
 ==================
-python build.py            # 数据→ELT→语义层查询→静态站导出 out/
+python build.py            # 数据→dbt 数仓(模型+行级测试)→语义层查询→静态站导出 out/
 python build.py --fresh    # 强制重放模拟数据
 产出:
-  data/metrichub.duckdb    轻量仓(DWD/DWS, SQL 加工, 幂等)
+  data/metrichub.duckdb    轻量仓(dbt: staging/DWD/DWS 模型 + 测试, 幂等, 单线程可复现)
   out/                     可部署静态站(GitHub Pages): api/*.json + 页面
 """
 import argparse
@@ -13,6 +13,8 @@ import json
 import math
 import re
 import shutil
+import subprocess
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -120,141 +122,26 @@ def _rolling_distinct(sl, name, m, window="14d"):
     return out, f"滚动 {m.get('default_time', '7d')} 窗口去重（按输出日重算, 非逐日相加）"
 
 
-# ---------- ELT: 原始 JSONL → DWD/DWS(全部 SQL 加工, 幂等) ----------
-ELT = """
-CREATE OR REPLACE TABLE dwd_event AS SELECT * FROM read_json_auto('data/events.jsonl');
-CREATE OR REPLACE TABLE dwd_task  AS SELECT * FROM read_json_auto('data/tasks.jsonl');
-CREATE OR REPLACE TABLE dwd_credits AS SELECT * FROM read_json_auto('data/credits.jsonl');
-CREATE OR REPLACE TABLE dwd_spend AS SELECT * FROM read_json_auto('data/spend.jsonl');
-CREATE OR REPLACE TABLE dwd_touch AS SELECT * FROM read_json_auto('data/touch.jsonl');
-
--- 订单 + 触点数(线性归因分母)
-CREATE OR REPLACE TABLE dwd_order AS
-SELECT o.*, coalesce(t.touch_cnt, 1) AS touch_cnt
-FROM read_json_auto('data/orders.jsonl') o
-LEFT JOIN (SELECT user_id, count(*) touch_cnt FROM dwd_touch GROUP BY 1) t USING (user_id);
-
--- 用户宽表: 一次性派生活化/付费/留存/TTFC 等"指标原料"(让语义层 expr 保持简单)
--- TTFC 用带分钟精度的 ts(此前用日期相减, 结果只有 0 或 1440, "分钟中位数"退化成布尔量)
-CREATE OR REPLACE TABLE dwd_user AS
-WITH u AS (SELECT * FROM read_json_auto('data/users.jsonl')),
-     first_ok AS (SELECT user_id, min(CAST(ts AS DATE)) fd,
-                         min(CAST(ts AS TIMESTAMP)) first_ts
-                  FROM dwd_task WHERE success GROUP BY 1),
-     pay AS (SELECT user_id, count(*) n FROM dwd_order WHERE NOT refund GROUP BY 1),
-     -- 次日留存必须是"次日当天"有活动。旧口径用 max(dt) >= signup+1, 那是"D1 或以后任意一天"
-     -- (无界滚动留存), 会把 14 天后才回来的人也算进次日留存 —— 实测 84.2%, 而真值只有 48.1%。
-     d1 AS (SELECT DISTINCT e.user_id
-            FROM dwd_event e JOIN u ON u.user_id = e.user_id
-            WHERE CAST(e.dt AS DATE) = CAST(u.signup_dt AS DATE) + 1)
-SELECT u.user_id, u.signup_dt, u.channel, u.channel_type, u.country, u.platform,
-       CAST(u.signup_dt AS DATE) AS signup_date,
-       (f.fd = u.signup_dt)                                   AS activated_1d,
-       (f.fd <= CAST(u.signup_dt AS DATE) + 6)                AS activated_7d,
-       date_diff('minute', CAST(u.signup_dt AS DATE)::TIMESTAMP, f.first_ts) AS ttfc_min,
-       (d1.user_id IS NOT NULL)                               AS retained_d1,
-       date_diff('day', CAST(u.signup_dt AS DATE), current_date) AS age_days,
-       (p.n IS NOT NULL) AS ever_paid
-FROM u
-LEFT JOIN first_ok f USING (user_id)
-LEFT JOIN d1 ON d1.user_id = u.user_id
-LEFT JOIN pay p ON p.user_id = u.user_id;
-
--- 模型单价维表: 定价的单一来源(此前 CASE 与模拟器两处各写一遍, 属于会漂移的重复)
-CREATE OR REPLACE TABLE dim_model_cost AS
-SELECT * FROM (VALUES
-    ('PixVerse V5', 0.006), ('Wan 2.5', 0.009), ('Vidu Q2', 0.013), ('Hailuo 02', 0.017),
-    ('Kling 2.5', 0.022), ('Runway Gen-4', 0.025), ('Sora 2', 0.030), ('Veo 3.1', 0.048)
-) AS t(model, api_cost_s);
-
--- 收入口径: **只认当期实收现金**(非退款订单), 再按各模型当日"消耗积分占比"分摊到模型。
--- 旧口径 revenue = 消耗积分 × $0.04 把"白送额度的燃烧"也记成了收入(14 天消耗 92,185,
--- 而已售发放只有 65,900), 使公司毛利率虚高到 33.1%, 现金口径只有 12.9% —— 护栏本身失效。
--- 改后毛利率的分母与 revenue_daily 完全对齐, 两个 unit=usd 的"收入"不再互相矛盾。
-CREATE OR REPLACE TABLE dws_cash_day AS
-SELECT CAST(dt AS DATE) AS dt, round(sum(amount) FILTER (WHERE NOT refund), 2) AS cash_usd
-FROM dwd_order GROUP BY 1;
-
--- 模型日汇总(毛利指标的 basis): 成本=成功秒数×厂商单价; 收入=当日现金按消耗积分占比分摊
-CREATE OR REPLACE TABLE dws_model_day AS
-WITH base AS (
-  SELECT t.dt, t.model, mc.api_cost_s,
-         count(*) AS calls, count(*) FILTER (WHERE t.success) AS success_calls,
-         sum(t.credits) AS credits_used,
-         round(sum(t.seconds) * mc.api_cost_s, 2) AS api_cost_usd
-  FROM dwd_task t LEFT JOIN dim_model_cost mc USING (model)
-  GROUP BY t.dt, t.model, mc.api_cost_s
-),
-day_tot AS (SELECT dt, sum(credits_used) AS tot FROM base GROUP BY dt)
-SELECT b.dt, b.model, b.calls, b.success_calls,
-       round(coalesce(c.cash_usd, 0) * b.credits_used / greatest(d.tot, 1), 2) AS revenue_usd,
-       b.api_cost_usd
-FROM base b
-LEFT JOIN day_tot d ON d.dt = b.dt
-LEFT JOIN dws_cash_day c ON c.dt = CAST(b.dt AS DATE);
-
-CREATE OR REPLACE TABLE dws_channel_day AS
-SELECT s.dt, s.channel, s.spend, coalesce(n.new_users, 0) AS new_users
-FROM dwd_spend s
-LEFT JOIN (SELECT CAST(signup_dt AS DATE) dt, channel, count(*) new_users
-           FROM dwd_user GROUP BY 1, 2) n ON n.dt = CAST(s.dt AS DATE) AND n.channel = s.channel;
-
--- 把获取渠道挂到任务上: 否则北极星(创作者数)无法按渠道归因, 增长域看不到自己的动作
--- (原来 dwd_task 只有 model/platform 两个维度, 这是「北极星审计」点出的致命缺口)
-CREATE OR REPLACE TABLE dwd_task_ch AS
-SELECT t.*, u.channel, u.channel_type, u.country
-FROM dwd_task t LEFT JOIN dwd_user u USING (user_id);
-
--- 渠道归因收入(首触): 订单按用户注册渠道归属, 供 roas 使用
-CREATE OR REPLACE TABLE dws_channel_attr AS
-SELECT CAST(o.dt AS DATE) dt, coalesce(u.channel, o.channel) channel,
-       sum(o.amount) FILTER (WHERE NOT o.refund) AS revenue_attr
-FROM dwd_order o LEFT JOIN dwd_user u USING (user_id)
-GROUP BY 1, 2;
-
--- ROAS 视图: 收入归因 + 花费对齐到同一张日表
-CREATE OR REPLACE TABLE dws_channel_roas AS
-SELECT coalesce(a.dt, s.dt) dt, coalesce(a.channel, s.channel) channel,
-       coalesce(s.spend, 0) spend, coalesce(a.revenue_attr, 0) revenue_attr
-FROM dws_channel_attr a FULL JOIN dws_channel_day s
-  ON CAST(s.dt AS DATE) = a.dt AND s.channel = a.channel;
-
--- 公司级毛利: 全模型汇总(模型域/CEO 视角, 口径与 model_gross_margin 完全一致, 只是不按模型分组)
-CREATE OR REPLACE TABLE dws_company_day AS
-SELECT dt, sum(revenue_usd) revenue_usd, sum(api_cost_usd) api_cost_usd
-FROM dws_model_day GROUP BY dt;
-
--- 高成本档任务占比: 按模型采购单价分档。
--- 阈值 $0.03/秒 是**经验运营阈值**, 不是从定价推导的。
--- 现金口径下本演示的平衡点 = 实收 $2,829 / 130,566 成功秒 ≈ $0.0217/秒 —— 所以 $0.03 偏保守:
--- Kling 2.5($0.022) 与 Runway($0.025) 其实已经负毛利, 却不在这条线以上(本指标只声明"高档位占比",
--- 不声明"负毛利占比")。若厂商调价或积分单价变化必须重算(生产应改为动态 break_even = 收入/成功秒数)。
--- 分母只算成功任务 —— 失败任务在模拟器里 seconds=0, 不产生厂商成本, 不应计入。
-CREATE OR REPLACE TABLE dws_cost_tier_day AS
-SELECT dt,
-       count(*) FILTER (WHERE success AND mc.api_cost_s >= 0.03) AS success_high_cost,
-       count(*) FILTER (WHERE success AND mc.api_cost_s <  0.03) AS success_low_cost
-FROM dwd_task t JOIN dim_model_cost mc USING (model)
-GROUP BY dt;
-
--- 付费留存(周环比): 上周付费的人里, 本周仍付费的比例。
--- 分子必须是"两周都付费"的用户(paid_cur AND paid_prev)。若误写成"本周所有付费用户",
--- 增长期该比率会 >100% —— 护栏把坏消息吃掉是最不能犯的错。
--- 按套餐分列, 否则该指标没有任何维度、语义层页展开会是空壳。
--- 注意: 该表是"按 plan 聚合后的单日快照", 不再支持逐日序列(窗口粒度), 故 series_grain=none。
-CREATE OR REPLACE TABLE dws_payer_cohort AS
-WITH orders AS (SELECT user_id, plan, CAST(dt AS DATE) d FROM dwd_order WHERE NOT refund),
-     cur_plan AS (SELECT user_id, arg_max(plan, d) AS plan FROM orders GROUP BY 1),
-     flags AS (SELECT user_id,
-                      max(CASE WHEN d > current_date - 7 THEN 1 ELSE 0 END) paid_cur,
-                      max(CASE WHEN d > current_date - 14 AND d <= current_date - 7 THEN 1 ELSE 0 END) paid_prev
-               FROM orders GROUP BY 1)
-SELECT current_date AS dt, p.plan,
-       count(*) FILTER (WHERE f.paid_cur = 1 AND f.paid_prev = 1) AS retained,
-       count(*) FILTER (WHERE f.paid_prev = 1) AS prev_payers
-FROM flags f JOIN cur_plan p USING (user_id)
-GROUP BY p.plan;
-"""
+# ---------- ELT: 原始 JSONL → DWD/DWS ----------
+# 数仓层已 dbt 化(见 dbt/ 目录): 模型文件化(staging/DWD/DWS)、行级测试(schema.yml)、
+# 血缘(ref() DAG)。旧版是本文件里一段 SQL 字符串常量 —— 无模型级测试、血缘靠人脑记,
+# 迁移原则是**等价替换**: 表名/口径/注释原样搬运, 迁移前后 out/api/*.json 必须逐字节一致。
+def run_dbt(anchor):
+    """dbt build = seed + 全部模型 + 全部行级测试。测试不过返回非零 → 构建失败(门禁前移到构建期)。
+    anchor 以 --vars 显式传入, 取代旧版 "ELT.replace('current_date', ...)" 的跑前字符串替换 ——
+    口径参数进模型文本, 而不是运行时偷偷改 SQL。确定性由 profiles.yml 的两处 threads=1 保证。"""
+    cmd = [sys.executable, "-m", "dbt.cli.main", "build",
+           "--project-dir", str(ROOT / "dbt"), "--profiles-dir", str(ROOT / "dbt"),
+           "--vars", json.dumps({"anchor_date": anchor.isoformat()}),
+           "--no-use-colors"]
+    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    done = [ln for ln in r.stdout.splitlines() if "PASS" in ln or "DONE" in ln]
+    print(f"[dbt] {len(done)} 项 seed/模型/测试通过")
+    if r.returncode != 0:
+        print(r.stdout[-6000:])
+        print(r.stderr[-2000:])
+        raise RuntimeError("dbt build 失败(模型编译或行级测试未过) —— 见上方日志")
 
 AI_DEMO = [
     {"q": "上周有多少付费用户？",
@@ -275,6 +162,24 @@ AI_DEMO = [
 ]
 
 
+def run_dbt_docs():
+    """dbt docs generate --static: 自包含单文件血缘图(模型 DAG/列级文档/测试挂载), 发布到 out/dbt-docs/。
+    旧版血缘隐含在 ELT 的书写顺序里(要靠人脑排依赖), 现在是 ref() 声明的显式 DAG, 可点开验证。"""
+    cmd = [sys.executable, "-m", "dbt.cli.main", "docs", "generate", "--static",
+           "--project-dir", str(ROOT / "dbt"), "--profiles-dir", str(ROOT / "dbt"),
+           "--no-use-colors"]
+    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        print(r.stdout[-3000:])
+        print(r.stderr[-2000:])
+        raise RuntimeError("dbt docs generate 失败 —— 见上方日志")
+    dst = OUT / "dbt-docs" / "index.html"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / "dbt" / "target" / "static_index.html", dst)
+    print(f"[dbt] 血缘图(可点 DAG) → {dst.relative_to(ROOT)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fresh", action="store_true")
@@ -283,15 +188,14 @@ def main():
     if args.fresh or not (ROOT / "data" / "users.jsonl").exists():
         simulator.main()
 
+    # 数仓层交给 dbt(模型 + 行级测试, 测试不过直接失败); 单线程确定性在 profiles.yml 里钉死
+    run_dbt(simulator.ANCHOR)
     con = duckdb.connect(str(ROOT / "data" / "metrichub.duckdb"))
-    # 单线程: DuckDB 默认按 CPU 核数并行做 hash 聚合, 而浮点加法不满足结合律 ——
+    # 语义层查询同样单线程: DuckDB 默认按 CPU 核数并行做 hash 聚合, 而浮点加法不满足结合律 ——
     # 同一份数据、同一份 SQL, 求和顺序随线程调度变化, round(...,1) 就会在边界上翻
     # (实测 model_gross_margin 的日序列在 -8.6 / -8.7 之间跳)。产物必须逐字节可复现:
     # 页面上的数字是随源码提交的, 产物漂移会让"每个数字可复现"这句话不成立。
     con.execute("SET threads TO 1")
-    # ELT 里的 current_date 一律换成锚定日期: 演示窗口是固定的(见 simulator.ANCHOR),
-    # 不能跟着 runner 的时区/日期走, 否则产物会随"跑在哪一天"漂移。
-    con.execute(ELT.replace("current_date", f"DATE '{simulator.ANCHOR.isoformat()}'"))
     sl = SemanticLayer(con=con, anchor=simulator.ANCHOR)
     # 可加性以 YAML 为准(单一事实源); DERIVED_ADDITIVE 仅作兼容兜底
     ADDITIVE_METRICS = {n for n, mm in sl.metrics.items()
@@ -422,6 +326,7 @@ def main():
     # 5) 静态站页面 —— 复制并把 __METRIC_COUNT__ 之类占位符渲染成真实数字,
     #    避免"加了指标忘了改文案"这类漂移(此前 20 这个数字硬编码在 3 个页面里).
     shutil.copytree(ROOT / "site", OUT, dirs_exist_ok=True)
+    run_dbt_docs()
     tokens = {"__METRIC_COUNT__": str(len(sl.metrics))}
     # 占位符渲染范围: 交付目录的 html + 仓库级 README(README 不发布, 但指标数是给人看的门面)。
     # README 的源就是仓库里的 README.md 本身, 所以渲染时把"字面量"回写成占位符形态再渲染 ——

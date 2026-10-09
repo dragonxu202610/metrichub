@@ -1,0 +1,11 @@
+version: 2
+
+seeds:
+  - name: dim_model_cost
+    description: 模型单价维表，采购定价的单一来源（此前 CASE 与模拟器两处各写一遍, 属于会漂移的重复）
+    columns:
+      - name: model
+        tests: [not_null, unique]
+      - name: api_cost_s
+        description: 厂商 API 成本 $/秒, 公开定价粗略估算 —— 模拟器成本与 DWS 分摊共用此表
+        tests: [not_null]
