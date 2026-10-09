@@ -4,7 +4,7 @@
 > 同时作为上下文（L1）与工具（L2）提供给 AI 问答——口径歧义在机器层消灭。
 
 面向「多模型聚合 + 积分订阅制」AI 视频平台的业务形态（模拟数据，14 天；每条业务设定的公开出处见站内「信源」页）。
-两层引擎：**数仓层 dbt**（16 个模型 + 74 项行级测试 + 口径守恒断言，血缘可点开）与
+两层引擎：**数仓层 dbt**（16 个模型 + 2 张维表 seed（定价 dim_model_cost / 渠道字典 dim_channel）+ 98 项 dbt 节点：模型+行级测试+守恒断言，总数随构建渲染于站点总览页；血缘可点开）与
 **语义层 `semantic.py`**（约 116 行，生产对应物 dbt MetricFlow / Cube）。另有演示级流批对账样例（`streaming/`）。
 
 ## 快速开始
@@ -46,7 +46,7 @@ metrichub/
 ├── metrics.yaml        # ★ 语义层: 31指标定义(名称/口径/维度/默认窗口/粒度/可加性/版本/争议)
 ├── semantic.py         # ★ 引擎: compile(YAML→SQL) / query(query_metric底层) / ai_context(L1注入)
 ├── dbt/                # ★ 数仓层: sources(JSONL)→staging→DWD→DWS; schema.yml 行级测试;
-│                       #   2 项口径守恒断言(现金/分摊); seeds=定价单一来源; 血缘 dbt docs --static
+│                       #   2 项口径守恒断言(现金/分摊)+渠道一致性断言; seeds=定价/渠道字典; 血缘 dbt docs --static
 ├── streaming/          # ★ 流批对账样例(演示级纯Python): 1h滚动窗口+45min有界乱序+迟到注入
 ├── simulator.py        # 14天业务模拟(SEO红人渠道/积分订阅/8家真实市场模型, Veo 3.1 旗舰负毛利)
 │                       #   锚点默认=构建当日, 固定种子下锚点平移只动日期不动数值
@@ -74,8 +74,8 @@ metrichub/
 都写 `nullif(分母, 0)` —— 分母为 0 时出参 `null` 而不是 `inf`（`inf` 会被 `json.dumps` 写成非法 JSON，
 前端 `JSON.parse` 直接抛错），`build.py` 写产物前还会再压一道，`check.py` 对全部产物做严格 JSON 校验。
 
-**数仓层（dbt）**：行级测试覆盖 not_null / unique / accepted_values / relationships（如渠道清单、套餐、
-模型名单、外键到用户表）；两项口径守恒断言——`dws_cash_day` 必须精确等于订单非退款聚合、
+**数仓层（dbt）**：行级测试覆盖 not_null / unique / accepted_values / relationships（如套餐、
+模型名单、外键到用户表）；渠道清单已收口 dim_channel seed（事实表由 assert_channels_conform 断言只允许字典内渠道，seed×模拟器一致性由 check.py 断言）；两项口径守恒断言——`dws_cash_day` 必须精确等于订单非退款聚合、
 `dws_model_day` 每日分摊收入之和必须回到当日现金（±$0.05 舍入容差）；迁移自旧内联 ELT 时以
 **基线逐字节 diff** 验收（等价迁移，语义层零改动）。
 

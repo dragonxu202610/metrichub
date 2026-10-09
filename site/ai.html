@@ -57,14 +57,14 @@
 
   <h2 class="sec"><span class="no">4</span>AI 编程提效：这个站是怎么被建出来的</h2>
   <div class="co co-good"><span class="cot">不藏工具</span>
-  本项目（含 dbt 迁移、74 项行级测试、守恒断言、七道门禁、新旧两版站点）由人定义口径与验收标准，
+  本项目（含 dbt 迁移、全套行级测试与守恒断言、七道门禁、新旧两版站点）由人定义口径与验收标准，
   AI 编程工具（ZCode / Claude Code / Cursor，即岗位 JD 点名的那类工具）结对完成实现。
   <b>分工是：AI 写代码，人签口径</b>——指标定义的每一行都是人拍板的，
   因为口径错误的代价不由工具承担，由开着数据会的业务承担。</div>
   <div class="grid g2">
     <div class="dcard"><div class="dh"><b>AI 擅长什么（本项目实证）</b></div>
       <ul><li>等价迁移：130 行内联 SQL → dbt 模型，基线逐字节 diff 验收</li>
-      <li>测试规模化：74 项行级测试一次生成，类型坑（DECIMAL vs DOUBLE）被 AI 预判</li>
+      <li>测试规模化：全套行级测试一次生成，类型坑（DECIMAL vs DOUBLE）被 AI 预判</li>
       <li>门禁工程：把"可信"翻译成可执行断言（占位符渲染/契约反向提取/举证复算）</li></ul></div>
     <div class="dcard"><div class="dh"><b>AI 不能代替什么（所以才是 owner 岗）</b></div>
       <ul><li>口径拍板：激活算 1d 还是 7d、归因用首触还是线性——是业务决策</li>

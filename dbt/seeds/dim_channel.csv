@@ -1,0 +1,10 @@
+channel,channel_type,has_spend
+google-organic,seo,false
+bing-organic,seo,false
+reddit-organic,seo,false
+influencer-tiktok,influencer,true
+influencer-youtube,influencer,true
+google-ads,paid,true
+facebook-ads,paid,true
+affiliate,affiliate,true
+direct,direct,false

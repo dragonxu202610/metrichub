@@ -28,8 +28,8 @@
       '<small>受 AI 消费的指标语义层</small></span></div>';
     NAV.forEach(function (item) {
       if (item.g) { html += '<div class="grp">' + item.g + '</div>'; return; }
-      var cls = 'it' + (item.sub ? ' sub' : '') +
-        (!item.sub && here === item.h.split('/').pop() ? ' on' : '');
+      // 子页(目录/看板/流批)与普通页一样按路径高亮 —— 否则打开子页时侧栏零高亮, 用户失位
+      var cls = 'it' + (item.sub ? ' sub' : '') + (here === item.h.split('/').pop() ? ' on' : '');
       html += '<a class="' + cls + '" href="' + item.h + '">' +
         (item.n ? '<span class="no">' + item.n + '</span>' : '') + item.t + '</a>';
     });

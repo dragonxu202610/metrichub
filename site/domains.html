@@ -23,9 +23,13 @@
   每条设定的具体出处见<a href="sources.html">公开信源</a>页；标注「推断」的内容欢迎被事实修正，
   修正画像后重跑 build，指标体系随之更新，这正是"口径即代码"的工作方式。</div>
 
+  <div class="co co-note" style="margin-top:14px"><span class="cot">关于「规划」标签</span>
+  本页的【规划】项是<b>生产路线图的显式记录</b>（补齐路径已写明、依赖已点名），不是待修缺陷——
+  把每个域"现在撑不起什么"如实标出，是数据域设计的一部分。</div>
+
   <h2 class="sec"><span class="no">1</span>六个数据域</h2>
-  <p class="sec-sub">现有 16 个 dbt 模型 + 1 个 seed 全部归位（孤儿表 = 0）。「指标组 group」是消费归属（组织视角），
-  与数据域（过程视角）刻意不对齐——对不齐之处正是口径冲突的发生地（见第 3 节）。</p>
+  <p class="sec-sub">现有 16 个 dbt 模型 + 2 个 seed（定价 dim_model_cost / 渠道字典 dim_channel）全部归位（孤儿表 = 0）。「指标组 group」是消费归属（组织视角），
+  与数据域（过程视角）刻意不对齐——对不齐之处正是口径冲突的发生地（见第 3 节），两者的显式映射见下方「业务域 × 数据域」。</p>
   <table class="tb">
     <tr><th style="width:88px">数据域</th><th>业务过程</th><th>事实 / 汇总表</th><th>粒度</th><th>服务的决策问题</th></tr>
     <tr><td><b>D1 用户域</b></td><td>注册（获客结果落账）</td>
@@ -44,15 +48,32 @@
       <td>credits → <code>dwd_credits</code> <span class="tg-ok">已实现</span>；台账资金来源字段或 FIFO 顺位、dws_balance_day <span class="tg-plan">规划</span></td>
       <td>1 行/台账变动</td><td>积分经济学：免费额度给多少、防薅、余额负债</td></tr>
     <tr><td><b>D6 获客域</b></td><td>触点曝光 · 渠道投放 · 归因分摊</td>
-      <td>touch → <code>dwd_touch</code>；spend → <code>dwd_spend</code>；<code>dws_channel_day</code>、<code>dws_channel_attr</code>、<code>dws_channel_roas</code> <span class="tg-ok">已实现</span>；订单×触点桥接表(weight=1/touch_cnt) <span class="tg-plan">规划</span></td>
+      <td>touch → <code>dwd_touch</code>；spend → <code>dwd_spend</code>；<code>dws_channel_day</code>、<code>dws_channel_attr</code>、<code>dws_channel_roas</code> <span class="tg-ok">已实现</span>；订单×触点桥接表(weight=1/touch_cnt) <span class="tg-plan">规划</span>。注意 <code>dwd_order.touch_cnt</code> 是本域<b>借道交易表</b>的历史权宜字段（线性归因分母长在订单上）——桥接表落地后归还本域</td>
       <td>1 行/触点；1 行/渠道·日</td><td>预算在 SEO/红人/付费间分配；SEO 助攻价值</td></tr>
   </table>
 
+  <h2 class="sec"><span class="no">1½</span>业务域 × 数据域：归属不等于划分</h2>
+  <p class="sec-sub">metrics.yaml 的 6 个 <b>group（业务域·组织视角：谁消费指标）</b>与上面 6 个<b>数据域（过程视角：表怎么组织）</b>是两个正交维度——
+  下表按 31 个指标的真实 <code>basis</code> 推导（每个业务域消费了哪些数据域的表）。看点：没有哪个业务域只吃一个域；
+  归因组（attribution）的收入分子在 D4 订单域、而 ROAS 的花费分母在 D6 获客域——<b>一条 ROAS 横跨两个数据域，正是"过程切分、维度对齐"的意义。</b></p>
+  <table class="tb">
+    <tr><th>业务域（group · 消费方）</th><th>消费的数据域（按 31 指标 basis 实测）</th><th>读法</th></tr>
+    <tr><td><b>north_star</b> 北极星（7）</td><td>D1 用户 · D3 创作</td><td>北极星本体在创作域，激活侧的"新增"读用户域</td></tr>
+    <tr><td><b>growth</b> 增长（5）</td><td>D1 用户 · D2 行为 · D6 获客</td><td>注册读 D1、DAU 读 D2、CAC/ROAS 读 D6——获客域的天然客户</td></tr>
+    <tr><td><b>product</b> 产品（5）</td><td>D1 用户 · D2 行为</td><td>激活/留存/TTFC 全部挂在用户宽表 + 行为域（会话缺口因此卡住产品域）</td></tr>
+    <tr><td><b>monetization</b> 商业化（8）</td><td>D1 · D3 · D4 交易 · D5 积分</td><td>毛利分摊横跨最广：收入在 D4、成本在 D3、消耗占比在 D5、付费者在 D1</td></tr>
+    <tr><td><b>model</b> 模型（4）</td><td>D3 创作</td><td>唯一单域消费者——模型上下架决策只需要创作域自洽</td></tr>
+    <tr><td><b>attribution</b> 归因（2）</td><td>D4 交易</td><td>收入分子在订单域（按注册渠道归属借道 dwd_user.channel）；花费侧见 growth 的 ROAS</td></tr>
+  </table>
+  <p class="tb-note">组织要什么指标（业务域）与表怎么组织（数据域）解耦后，新业务域接入 = 在语义层声明新 group，
+  底层数据域不必跟着重组——这正是总线矩阵"过程 × 一致性维度"设计的交付形态。</p>
+
   <h2 class="sec"><span class="no">2</span>总线矩阵：业务过程 × 一致性维度</h2>
   <p class="sec-sub">◆ = 已实现（字段在事实表中，或经既有 join 可达）；△ = 规划（需补维表/字段）；— = 不适用。
-  唯一成形的维表是 <code>dim_model_cost</code>；日期/用户以 dt 字段 + dwd_user 宽表<b>隐式一致</b>；
-  渠道清单目前散落 3 处（sources.yml accepted_values / 模拟器常量 / 各表字段）各自维护——
-  <span class="tg-plan">规划</span> dim_channel / dim_plan / dim_geo 统一收口。</p>
+  维表现状：<code>dim_model_cost</code>（定价）与 <code>dim_channel</code>（渠道字典：名称/类型/有无投放）两张 seed 已收口；
+  渠道清单此前散落 3 处（sources.yml、模拟器常量、各表字段）各自维护——现在以 dim_channel 为单一来源，
+  事实表由 <code>assert_channels_conform</code> 断言只允许字典内渠道，seed×模拟器一致性由 check.py 断言。
+  日期/用户仍以 dt 字段 + dwd_user 宽表<b>隐式一致</b>；<span class="tg-plan">规划</span> dim_plan / dim_geo 继续收口。</p>
   <table class="tb">
     <tr><th>业务过程 ＼ 维度</th><th class="r">日期</th><th class="r">用户</th><th class="r">模型</th><th class="r">渠道</th><th class="r">套餐</th><th class="r">国家</th><th class="r">平台</th><th class="r">页面</th></tr>
     <tr><td>注册 users</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td><td class="r">◆</td><td class="r">—</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td></tr>
@@ -93,11 +114,11 @@
       <td>users.signup_dt 仅为 date；<code>rng.random() &lt; .06/.05/.03</code></td>
       <td><span class="tg-plan">规划</span> 注册事件带时分；页面已声明先验性质</td></tr>
     <tr><td>D2</td><td>事件仅 dt 无时刻、无 session/访客 ID；page 仅 6 枚举、event_type 仅 view</td>
-      <td>北极星树 7 叶中「会话/访客数、沉默召回」无定义（5/7 有定义、4/7 可信）</td>
+      <td>北极星树 7 叶中「会话/访客数、沉默召回」无定义（5/7 已定义，覆盖率随评估落盘 northstar_evidence.json 的 tree_coverage）</td>
       <td><span class="tg-plan">规划</span> 埋点规范 + dwd_session + dim_page——先补埋点维度，不是加一条 YAML</td></tr>
-    <tr><td>D3</td><td>staging 层模型冠 dwd_ 前缀，与目录名（01_staging）不符；成本单价为公开定价粗估；失败任务成本恒 0</td>
+    <tr><td>D3</td><td>staging 目录产出 dwd_ 前缀表——命名跨层是<b>等价迁移的刻意取舍</b>：迁移验收要求语义层 basis 零改动，故表名保留 dwd_，目录名 01_staging 只表达加载顺序（直通落地层）；成本单价为公开定价粗估；失败任务成本恒 0</td>
       <td><code>dbt/models/01_staging/dwd_*.sql</code> ×5；dim_model_cost 注释</td>
-      <td><span class="tg-plan">规划</span> 更名 stg_ 前缀（ref 血缘自动跟随）；接真实采购价</td></tr>
+      <td>生产可改 stg_ 前缀并同步语义层 basis（一次显式变更, 走版本管理）；<span class="tg-plan">规划</span> 接真实采购价</td></tr>
     <tr><td>D4</td><td>现金当期全额确认，已售未消耗积分（负债）无口径</td>
       <td>dws_cash_day 仅非退款聚合</td>
       <td><span class="tg-plan">规划</span> dwd_subscription + 递延收入科目</td></tr>

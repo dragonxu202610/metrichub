@@ -57,7 +57,7 @@
   每道 CI 门禁都对应一类生产监控的对应物：</p>
   <table class="tb">
     <tr><th style="width:230px">CI 步骤（顺序执行）</th><th>门禁职责</th><th style="width:230px">生产监控对应物</th></tr>
-    <tr><td><code>build.py --fresh</code>（内含 dbt build）</td><td>74 行级测试 + 2 守恒断言，不过则构建失败</td><td>ETL 任务的数据质量卡点/告警</td></tr>
+    <tr><td><code>build.py --fresh</code>（内含 dbt build）</td><td>__DBT_TEST_COUNT__ 项 dbt 节点（模型 + 行级测试 + 守恒断言），不过则构建失败</td><td>ETL 任务的数据质量卡点/告警</td></tr>
     <tr><td><code>check.py --data</code></td><td>口径契约 / 前端×产物契约 / 跨文件一致 / 数据侧失真</td><td>数据质量巡检（DQC 规则集）</td></tr>
     <tr><td><code>evidence.py</code></td><td>页面每个数字可从产物复算（弹性按日期对、流批守恒）</td><td>报表数字稽核（BI 数 vs 明细数）</td></tr>
     <tr><td><code>northstar_eval.py</code></td><td>判据预注册 + 三候选弹性落盘</td><td>指标有效性复盘（防事后择优）</td></tr>

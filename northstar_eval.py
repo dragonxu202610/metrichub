@@ -196,6 +196,32 @@ def main():
         else:
             verdicts.append({"id": "R3", "decision": "abstain", "evidence": "相关系数不可计算"})
     result["verdicts"] = verdicts
+    # 证伪条件三态表(随评估落盘): 状态是对"判据现在能不能被执行"的盘点, 不是对结果的判断 ——
+    # 不把"可执行的"降级成"需埋点的", 也不把"需埋点的"伪装成可执行。页面引用本表, 不再手写状态。
+    result["falsification_checks"] = [
+        {"check": "人 vs 产出：谁更贴钱", "window": "连续 2 个季度", "status": "现在可执行",
+         "rule": "若 active_creators 与收入的相关系数低于创作数/分钟数, 触发改判(R1) —— 唯一能推翻北极星本身的可执行检验"},
+        {"check": "创作者是否只被『一次性尝鲜』撑起", "window": "每月", "status": "现在可执行",
+         "rule": "若 active_creators 上升而 creations_per_active_user 连续 3 个月下降, 北极星在被尝鲜撑起"},
+        {"check": "是否需要换消耗口径的单位", "window": "连续 2 个季度", "status": "现在可执行",
+         "rule": "若分钟数与收入的相关性比创作数高 0.1 以上, 消耗口径主指标换成分钟(R3)"},
+        {"check": "毛利是否被北极星牺牲", "window": "每季度", "status": "现在可执行",
+         "rule": "Δcompany_gross_margin < −3pp 且 Δweekly_minutes_generated < +10% → 引入毛利约束"},
+        {"check": "免费额度是否在灌水", "window": "每月", "status": "部分可执行",
+         "rule": "free_credit_burn_rate 已可读(分母只算免费发放, <55% 告警; 付费附赠由 paid_credit_burn_rate 单列); 缺免费→付费转化率"},
+        {"check": "深度创作者占比", "window": "每月", "status": "需新增定义",
+         "rule": "需要『每周创作 ≥2 次的创作者数』—— 一行 YAML 即可(deep_creator_share, 规划)"},
+        {"check": "创作是否真的被消费", "window": "每季度", "status": "需补埋点",
+         "rule": "需要 save/share 事件埋点(当前 event_type 恒为 view), 字段与触发时机见 PLAN-90D"},
+    ]
+    # 拆解树覆盖率: 7 个叶子中无定义的 2 个 —— 由 metrics.yaml 注册现状盘点而来,
+    # 页面引用覆盖率时以本表为准, 不再各自手写分数。
+    result["tree_coverage"] = {
+        "total_leaves": 7,
+        "defined_leaves": 5,
+        "missing": ["会话/访客数(需补 session_id 埋点)", "沉默召回(需补回流事件)"],
+        "note": "defined=已注册指标的叶子; 『可信』程度另见各指标 notes, 不在本表评分",
+    }
 
     OUT.mkdir(exist_ok=True)
     (API / "northstar_evidence.json").write_text(

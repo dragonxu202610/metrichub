@@ -18,6 +18,10 @@
     以下每个节点都锚定 <code>metrics.yaml</code> 的真实定义——<span class="tg-ok">已实现</span>可直接查数，<span class="tg-plan">规划</span>给出了定义草案。</p>
   </div>
 
+  <div class="co co-note" style="margin-top:14px"><span class="cot">关于「规划」标签</span>
+  本页与<a href="domains.html">业务结构页</a>的【规划】项是<b>生产路线图的显式记录</b>（演示环境不实现、但定义草案已就位），
+  不是待修缺陷——把"现在做不了什么"写清楚，与把"做了什么"写清楚同样重要。</div>
+
   <h2 class="sec"><span class="no">1</span>北极星：结论卡</h2>
   <div class="card">
     <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
@@ -34,7 +38,7 @@
     <p class="small" style="margin:8px 0 0">R1 输出「<b>不可区分</b>」——三者与收入的相关系数均为 0.997，演示数据无法裁决。
     选「人」的依据是机制论证（见下节），需 ≥2 个季度真实数据重跑判据后才算数据背书。
     判据预注册于 <code>northstar_eval.py</code>（先于结果存在，防事后择优），证据落盘
-    <a href="out/api/northstar_evidence.json" target="_blank" rel="noopener">northstar_evidence.json</a>。</p>
+    <a href="api/northstar_evidence.json" target="_blank" rel="noopener">northstar_evidence.json</a>。</p>
   </div>
 
   <h2 class="sec"><span class="no">2</span>为什么是「人」不是「次数/分钟」：机制论证</h2>
@@ -56,7 +60,7 @@
           <ul>
             <li><span class="tnode"><b>sessions</b> 会话数 <span class="tg-plan">规划</span><span class="tv">basis dwd_event · 需补 session_id——漏斗第一跳目前是空的</span></span></li>
             <li><span class="tnode"><b>signup_rate</b> 注册率 <span class="tg-plan">规划</span><span class="tv">new_users ÷ sessions · 分母缺，只能算半步</span></span></li>
-            <li><span class="tnode"><b>new_users</b> 日新注册 <span class="tnum num">5,961</span> <span class="tg-ok">已实现</span><span class="tv">最大源 google-organic 1,689</span></span></li>
+            <li><span class="tnode"><b>new_users</b> 近 14 天新注册 <span class="tnum num">5,961</span> <span class="tg-ok">已实现</span><span class="tv">日粒度指标, 日末点约 572; 最大源 google-organic 1,689(14d 窗口分解)</span></span></li>
             <li><span class="tnode"><b>seo_signup_share</b> SEO 注册占比 <span class="tg-ok">已实现</span><span class="tv">自然流量依赖度</span></span></li>
             <li><span class="tnode"><b>cac</b> 渠道获客成本 <span class="tg-ok">已实现</span><span class="tv">$1.8(affiliate) ~ $8.4(facebook-ads)</span></span></li>
           </ul></li>
@@ -117,7 +121,7 @@
       <td>model_success_rate 已实现（按模型 85.4~96.7%）；<span class="tg-plan">规划</span> task_failure_rate 全局口径 + channel/platform 维度——失败体验与渠道质量相关</td></tr>
     <tr><td>退款率</td><td><span class="tg-bad">无</span></td><td>同护栏表 refund_rate <span class="tg-plan">规划</span></td></tr>
     <tr><td>免费额度依赖</td><td><span class="tg-ok">有（近似）</span></td>
-      <td>free_credit_burn_rate 57.6~81.8%（&lt;55% 告警）+ paid_credit_burn_rate；精确的「免费消耗占总消耗」不可算——台账无资金来源字段（<a href="domains.html">D5 粗糙点</a>）</td></tr>
+      <td>free_credit_burn_rate 默认 7d 窗口值 <b class="num">76.6%</b>（&lt;55% 告警；notes 记录的 14d 逐日历史区间 57.6~81.8%）+ paid_credit_burn_rate 默认 7d 窗口值 <b class="num" style="color:var(--bad)">125.6%——大于 100% 本身就是口径警报</b>：分子含免费消耗（台账无资金来源字段，见<a href="domains.html">D5 粗糙点</a>），这正是"只能换分母、不拆分子"限制的直观体现</td></tr>
     <tr><td>深度创作者占比</td><td><span class="tg-bad">无</span></td><td>deep_creator_share <span class="tg-plan">规划</span>：防「尝鲜撑起北极星」，即审计推翻条件 R2 的观测项</td></tr>
   </table>
 
@@ -144,7 +148,8 @@
     <tr><td><b>R3</b></td><td>成功创作数保留为消耗口径；若「次数与创作者数背离」（重度用户效应）在真实数据可测 → 升级为警报</td>
       <td><span class="tg-ok">保留</span></td></tr>
   </table>
-  <p class="tb-note">推翻条件表的完整三态标注（现在可执行 4 / 部分可执行 1 / 需新增定义 1 / 需补埋点 1）在 northstar_evidence.json。</p>
+  <p class="tb-note">七条推翻条件的完整三态标注随评估落盘在 northstar_evidence.json 的 <code>falsification_checks</code> 字段
+  （现在可执行 4 / 部分可执行 1 / 需新增定义 1 / 需补埋点 1）；拆解树覆盖率见同文件 <code>tree_coverage</code>（7 叶中 5 已定义）。</p>
 
   <h2 class="sec"><span class="no">9</span>31 个指标健康度盘点（粗糙点直说）</h2>
   <div class="grid g4">

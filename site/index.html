@@ -21,10 +21,10 @@
   <div class="stats">
     <div class="stat acc"><div class="n">__METRIC_COUNT__</div><div class="l">已注册指标（YAML 单一事实源）</div></div>
     <div class="stat"><div class="n">16</div><div class="l">dbt 模型（staging/DWD/DWS）</div></div>
-    <div class="stat"><div class="n">76</div><div class="l">行级测试 + 守恒断言</div></div>
+    <div class="stat"><div class="n">__DBT_TEST_COUNT__</div><div class="l">dbt 节点：模型+行级测试+断言</div></div>
     <div class="stat"><div class="n">6</div><div class="l">数据域（按业务过程划分）</div></div>
     <div class="stat"><div class="n">7</div><div class="l">交付门禁（不过不发布）</div></div>
-    <div class="stat"><div class="n">8</div><div class="l">页面（含旧版归档切换）</div></div>
+    <div class="stat"><div class="n">11</div><div class="l">v2 页面（另含 v1 旧版归档）</div></div>
   </div>
 
   <div class="co co-warn"><span class="cot">诚实边界（先读这个）</span>
@@ -82,7 +82,7 @@
       <text x="496" y="52" text-anchor="middle" font-weight="700" fill="#3c34ad">dbt 数仓</text>
       <text x="496" y="74" text-anchor="middle" fill="#5f6875" font-size="11.5">staging → DWD → DWS</text>
       <text x="496" y="92" text-anchor="middle" fill="#5f6875" font-size="11.5">16 模型 · ref() 血缘</text>
-      <text x="496" y="112" text-anchor="middle" fill="#0e8a4d" font-size="11">74 测试 + 2 守恒断言</text>
+      <text x="496" y="112" text-anchor="middle" fill="#0e8a4d" font-size="11">__DBT_TEST_COUNT__ 项测试与守恒断言</text>
       <text x="496" y="132" text-anchor="middle" fill="#8b93a1" font-size="10.5">单线程 · 逐字节可复现</text>
       <text x="496" y="152" text-anchor="middle" fill="#8b93a1" font-size="10.5">dim_model_cost = 定价单源</text>
 

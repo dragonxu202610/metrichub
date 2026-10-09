@@ -9,3 +9,20 @@ seeds:
       - name: api_cost_s
         description: 厂商 API 成本 $/秒, 公开定价粗略估算 —— 模拟器成本与 DWS 分摊共用此表
         tests: [not_null]
+
+  - name: dim_channel
+    description: 渠道字典（一致性维度）——渠道清单/类型/是否有投放的单一来源。
+      此前同一份清单散落三处各自维护（sources.yml 的 accepted_values、模拟器常量、各表字段），
+      属于总线矩阵里"维度不收口"的典型缺口；现在以 seed 收口，事实表由
+      assert_channels_conform 断言只允许字典内的渠道，check.py 另断言 seed 与模拟器清单一致。
+    columns:
+      - name: channel
+        tests: [not_null, unique]
+      - name: channel_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: [seo, influencer, paid, affiliate, direct]
+      - name: has_spend
+        description: 是否有投放花费 —— ROAS 的"分母是否存在"由字典声明, 不再靠人记
+        tests: [not_null]

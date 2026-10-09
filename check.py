@@ -184,6 +184,23 @@ def check_contracts():
                  f"产物过期(重跑 python build.py --fresh)或需 --anchor 钉住复现窗口")
         else:
             ok(f"数据窗口锚定在 {_sim.ANCHOR}(与构建锚一致, 不随 runner 时区漂移)")
+        # 半陈旧防线: 数据文件必须与构建锚同窗 —— jsonl 是旧锚的而构建用新锚时, 窗口会
+        # 切掉首日又缺末日, 全部窗口值静默漂移(as_of 门禁对此失明, 因为 as_of 用的就是新锚)。
+        try:
+            import json as _json
+            uf = ROOT / "data" / "users.jsonl"
+            last = None
+            if uf.exists():
+                with open(uf, encoding="utf-8") as fh:
+                    for ln in fh:
+                        last = _json.loads(ln).get("signup_dt")
+            if last != _sim.ANCHOR.isoformat():
+                fail(f"users.jsonl 最大注册日={last!r} != 锚定日 {_sim.ANCHOR} —— 数据与构建锚不同窗"
+                     f"(半陈旧状态, 数值不可信), 重跑 python build.py --fresh")
+            else:
+                ok(f"数据文件与构建锚同窗(最大注册日={last})")
+        except Exception as e:                                   # noqa: BLE001
+            warn(f"无法校验数据文件窗口({e})")
     except Exception as e:                                   # noqa: BLE001
         warn(f"无法导入 simulator 校验窗口锚定: {e}")
 
@@ -318,6 +335,34 @@ def check_cross_file(metrics):
                      f"仅维表有 {sorted(cost_models - sim_models)}")
             else:
                 ok(f"dim_model_cost seed 覆盖全部 {len(sim_models)} 个模型")
+        # 渠道字典(dim_channel seed)与模拟器清单一致性: 渠道名/类型/是否有投放三列都要对齐 ——
+        # 字典是一致性维度的收口(事实表只允许字典内渠道), 它若与生成端漂移,
+        # assert_channels_conform 会当场拦住, 但根因通常在这里就错了。
+        ch_seed = ROOT / "dbt" / "seeds" / "dim_channel.csv"
+        if not ch_seed.exists():
+            fail("dbt/seeds/dim_channel.csv 不存在 —— 渠道字典(一致性维度)缺失")
+        else:
+            import csv as _csv
+            with open(ch_seed, encoding="utf-8") as f:
+                rows = {r["channel"]: (r.get("channel_type"), r.get("has_spend"))
+                        for r in _csv.DictReader(f) if r.get("channel")}
+            sim_ch = {c[0]: c[1] for c in simulator.CHANNELS}
+            spend_ch = {"influencer-tiktok", "influencer-youtube", "google-ads",
+                        "facebook-ads", "affiliate"}   # 模拟器里写花费的 5 个渠道
+            bad = []
+            for ch, (ctype, has_spend) in rows.items():
+                if sim_ch.get(ch) != ctype:
+                    bad.append(f"{ch}: 类型 seed={ctype} vs 模拟器={sim_ch.get(ch)}")
+                want = "true" if ch in spend_ch else "false"
+                if str(has_spend).lower() != want:
+                    bad.append(f"{ch}: has_spend seed={has_spend} vs 模拟器={want}")
+            if set(rows) != set(sim_ch):
+                bad.append(f"渠道集合不一致: 仅 seed 有 {sorted(set(rows)-set(sim_ch))}, "
+                           f"仅模拟器有 {sorted(set(sim_ch)-set(rows))}")
+            if bad:
+                fail("dim_channel seed 与模拟器渠道清单不一致: " + "; ".join(bad))
+            else:
+                ok(f"dim_channel seed 与模拟器 {len(rows)} 个渠道(名/类型/有无投放)全部一致")
         # 锚定日期的 dbt 默认值钉在"参考复现锚"上: 真实构建由 build.py 以 --vars 传构建当日,
         # 默认值只服务手工 dbt run 的开发者 —— 它必须指向文档化的参考窗口(REFERENCE_ANCHOR),
         # 否则"不传参的裸 dbt run"会拿 today 当锚, 与任何已发布产物都对不上。

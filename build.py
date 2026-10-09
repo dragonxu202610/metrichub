@@ -130,7 +130,8 @@ def _rolling_distinct(sl, name, m, window="14d"):
 def run_dbt(anchor):
     """dbt build = seed + 全部模型 + 全部行级测试。测试不过返回非零 → 构建失败(门禁前移到构建期)。
     anchor 以 --vars 显式传入, 取代旧版 "ELT.replace('current_date', ...)" 的跑前字符串替换 ——
-    口径参数进模型文本, 而不是运行时偷偷改 SQL。确定性由 profiles.yml 的两处 threads=1 保证。"""
+    口径参数进模型文本, 而不是运行时偷偷改 SQL。确定性由 profiles.yml 的两处 threads=1 保证。
+    返回本次执行的节点总数(seed+模型+测试), 供页面占位符渲染 —— 测试数不再手写, 加测试不必改文案。"""
     cmd = [sys.executable, "-m", "dbt.cli.main", "build",
            "--project-dir", str(ROOT / "dbt"), "--profiles-dir", str(ROOT / "dbt"),
            "--vars", json.dumps({"anchor_date": anchor.isoformat()}),
@@ -139,10 +140,17 @@ def run_dbt(anchor):
                        encoding="utf-8", errors="replace")
     done = [ln for ln in r.stdout.splitlines() if "PASS" in ln or "DONE" in ln]
     print(f"[dbt] {len(done)} 项 seed/模型/测试通过")
+    total = None
+    m = re.search(r"TOTAL=(\d+)", r.stdout)
+    if m:
+        total = int(m.group(1))
     if r.returncode != 0:
         print(r.stdout[-6000:])
         print(r.stderr[-2000:])
         raise RuntimeError("dbt build 失败(模型编译或行级测试未过) —— 见上方日志")
+    if total is None:
+        raise RuntimeError("未能从 dbt 输出解析 TOTAL 节点数 —— 占位符无法渲染")
+    return total
 
 AI_DEMO = [
     {"q": "上周有多少付费用户？",
@@ -203,6 +211,22 @@ def build_v1(tokens):
         page.write_text(text, encoding="utf-8")
 
 
+def data_is_current():
+    """数据文件与当前锚是否同窗。半陈旧状态(jsonl 是旧锚的、构建用新锚)会让窗口切掉首日又缺末日,
+    所有窗口值静默漂移 —— 比报错危险得多。判据: users.jsonl 的最大注册日应等于锚定日。"""
+    f = ROOT / "data" / "users.jsonl"
+    if not f.exists():
+        return False
+    last = None
+    with open(f, encoding="utf-8") as fh:
+        for ln in fh:                      # 逐行扫, 取最后一行的 signup_dt(模拟器按日序写)
+            try:
+                last = json.loads(ln).get("signup_dt")
+            except Exception:              # noqa: BLE001
+                return False
+    return bool(last) and str(last) == simulator.ANCHOR.isoformat()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fresh", action="store_true")
@@ -215,11 +239,14 @@ def main():
         # 固定种子下锚点平移只平移日期标签、数值不变(见 simulator.py 头注释)
         simulator.ANCHOR = date.fromisoformat(args.anchor)
 
-    if args.fresh or not (ROOT / "data" / "users.jsonl").exists():
+    if args.fresh or not data_is_current():
+        if not args.fresh:
+            print("[build] 数据文件与当前锚不同窗(跨日/换锚) —— 自动重放模拟数据对齐")
         simulator.main()
 
     # 数仓层交给 dbt(模型 + 行级测试, 测试不过直接失败); 单线程确定性在 profiles.yml 里钉死
-    run_dbt(simulator.ANCHOR)
+    # 返回的节点总数(seed+模型+测试)进占位符, 页面测试数随构建自渲染
+    dbt_total = run_dbt(simulator.ANCHOR)
     con = duckdb.connect(str(ROOT / "data" / "metrichub.duckdb"))
     # 语义层查询同样单线程: DuckDB 默认按 CPU 核数并行做 hash 聚合, 而浮点加法不满足结合律 ——
     # 同一份数据、同一份 SQL, 求和顺序随线程调度变化, round(...,1) 就会在边界上翻
@@ -277,6 +304,9 @@ def main():
                     "series_window": mwin, "series_note": series_note, "notice": notice,
                     "by_dim_window": "14d",
                     "by_dim_basis": "逐日求和" if by_dim_sums_daily else "窗口内聚合",
+                    # window_value: 按该指标默认窗口取的窗口内单值 —— evidence 据此复算页面引用的
+                    # "48.1% 留存 / 72.4% 免费燃烧"这类无日序列指标, 否则它们只能靠手抄无从对账
+                    "window_value": round(sl.scalar(name, mwin), 1),
                     "series": series, "by_dim": by_dim}, indent=None)
 
     # 3) 看板视图模型
@@ -365,6 +395,7 @@ def main():
     ss = stream_cmp["stats"]
     a = simulator.ANCHOR
     tokens = {"__METRIC_COUNT__": str(len(sl.metrics)),
+              "__DBT_TEST_COUNT__": str(dbt_total),
               "__STREAM_BATCH__": f"{ss['batch_total']:,}",
               "__STREAM_DROPPED__": str(ss["wm_dropped"]),
               "__STREAM_MISPLACED__": str(ss["misplaced"]),

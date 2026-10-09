@@ -191,6 +191,60 @@ def main():
                 else:
                     warn(f"realtime 页未引用{label}数字 {v} —— 若已改文案请同步")
 
+    # ---------- E. KPI 对账: v2 内容页(metrics/domains)手写数字必须与产物一致 ----------
+    # 这些页面是 v2 最重的两个内容页, 在本节之前它们的数字不受任何门禁复算 ——
+    # "每个数字可复现"不能只对 v1 时代的看板页成立。window_value 来自 build.py 落盘(默认窗口单值)。
+    mx = (rendered or pages).get("metrics.html")
+    if mx and dash:
+        kmap = {k["metric"]: k["value"] for k in dash.get("kpis", [])}
+        # (页面文本, 产物字段, 说明, 容差): 容差只容纳显示层四舍五入(如 1575.9 显示 1,576),
+        # 量级与相邻 KPI 的混淆(如 13.1 vs 13.5)仍会被抓住
+        checks = [("4,278", kmap.get("active_creators"), "北极星末值", 0.05),
+                  ("13,542", kmap.get("weekly_successful_creations"), "周创作数", 0.05),
+                  ("1,576", kmap.get("weekly_minutes_generated"), "周分钟数(整数化显示)", 0.5),
+                  ("3.2", kmap.get("creations_per_active_user"), "人均创作", 0.05),
+                  ("13.5", kmap.get("payer_retention_wow"), "付费留存", 0.05),
+                  ("12.9", kmap.get("company_gross_margin"), "公司毛利", 0.05),
+                  ("1,535.2", kmap.get("balance_capped_revenue_gap"), "收入缺口", 0.05),
+                  ("13.1", kmap.get("high_cost_exposure"), "高成本暴露", 0.05)]
+        for text, real, label, tol in checks:
+            if text in mx and real is not None:
+                shown = float(text.replace(",", ""))
+                if abs(shown - round(float(real), 1)) <= tol:
+                    ok(f"metrics 页 {label} {text} 与 dashboard.json 一致")
+                else:
+                    fail(f"metrics 页 {label} 写 {text}, 产物是 {round(float(real), 1)} —— 页面数字过期")
+        # 无日序列指标的窗口单值(retention/燃烧率)与模型毛利极值: 来自 metric_*.json
+        def wv(name):
+            d = load(f"metric_{name}.json")
+            return (d or {}).get("window_value")
+        for text, name, label in [("48.1", "retention_d1", "次日留存"),
+                                  ("76.6", "free_credit_burn_rate", "免费燃烧率(默认7d)"),
+                                  ("125.6", "paid_credit_burn_rate", "付费燃烧率(默认7d)")]:
+            real = wv(name)
+            if text in mx and real is not None:
+                if abs(float(text) - round(float(real), 1)) <= 0.05:
+                    ok(f"metrics 页 {label} {text} 与 metric_{name}.json 的 window_value 一致")
+                else:
+                    fail(f"metrics 页 {label} 写 {text}, window_value 是 {round(float(real), 1)}")
+        gm = load("metric_model_gross_margin.json")
+        if gm:
+            veo = next((i["value"] for i in gm.get("by_dim", {}).get("model", [])
+                        if i["key"] == "Veo 3.1"), None)
+            if "125.6" in mx and veo is not None:
+                if abs(abs(veo) - 125.6) <= 0.05:
+                    ok("metrics 页 Veo 3.1 毛利 −125.6 与产物一致")
+                else:
+                    fail(f"metrics 页 Veo 3.1 毛利写 125.6, 产物是 {veo}")
+        # 14 天窗口合计口径的注册数(防止"日新注册 5,961"这类口径标签错位再犯: 值可对, 标签被本节钉死)
+        if "近 14 天新注册 5,961" in mx or "5,961" not in mx:
+            nu = load("metric_new_users.json")
+            tot = sum(i["value"] for i in (nu or {}).get("series", []) if i.get("value") is not None)
+            if "近 14 天新注册 5,961" in mx and abs(tot - 5961) <= 1:
+                ok(f"metrics 页新注册 5,961 标注为 14 天窗口合计, 与序列合计 {tot:.0f} 一致")
+            elif "近 14 天新注册 5,961" not in mx and "5,961" in mx:
+                fail("metrics 页 5,961 未标注『近 14 天』窗口口径 —— 同名指标两种读法, 必须钉死标签")
+
     print_report()
     return 1 if FAIL else 0
 
