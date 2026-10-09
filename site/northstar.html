@@ -193,15 +193,15 @@
 
   <div class="ev">
     <b>① 「与收入线性相关」不成立，只能说到"同向"。</b>
-    相邻两日对比：10-07→10-08 创作数 +8.1% 而收入 +84.3%，<b>弹性 10.4</b>；
-    另一组相邻日（10-02→10-03，+15.9% vs +32.9%）弹性约 <b>2.06</b> —— 同样是"同向"，弹性差约 5 倍。
+    相邻两日对比：__PAIR1_FROM__→__PAIR1_TO__ 创作数 +8.1% 而收入 +84.3%，<b>弹性 10.4</b>；
+    另一组相邻日（__PAIR2_FROM__→__PAIR2_TO__，+15.9% vs +32.9%）弹性约 <b>2.06</b> —— 同样是"同向"，弹性差约 5 倍。
     两者之间隔着积分定价、套餐结构、退款与模型成本，不是线性关系。
-    <span class="src">证据：<code>out/api/dashboard.json</code> 的 creations 与 revenue 序列（2026-09-25 ~ 10-08）</span>
+    <span class="src">证据：<code>out/api/dashboard.json</code> 的 creations 与 revenue 序列（__WIN_START_FULL__ ~ __WIN_END__）</span>
   </div>
 
   <div class="ev">
     <b>② 计数口径会抹平时长差异。</b>
-    10-08 单日：创作数 2,469 次、视频 287.2 分钟 → 平均产出 7.0 秒/次，
+    __WIN_END__ 单日：创作数 2,469 次、视频 287.2 分钟 → 平均产出 7.0 秒/次，
     而单任务时长是 <code>rng.randint(2, 12)</code>（均值 7.0）。
     <b>"平均 7 秒/次"就是模拟器参数的算术结果</b> —— 它演示的是"计数口径抹平时长差异"这个机制。
     <span class="src">证据：<code>out/api/dashboard.json</code> · <code>simulator.py</code> 的 <code>secs = rng.randint(2, 12)</code></span>

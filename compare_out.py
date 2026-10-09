@@ -16,7 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 SITE, OUT = ROOT / "site", ROOT / "out"
 # 构建期渲染的占位符: 比对前先"预渲染"一遍源文件, 否则 out/ 永远与 site/ 不同
-TOKENS = ("__METRIC_COUNT__", "__STREAM_BATCH__", "__STREAM_DROPPED__", "__STREAM_MISPLACED__")
+TOKENS = ("__METRIC_COUNT__", "__STREAM_BATCH__", "__STREAM_DROPPED__", "__STREAM_MISPLACED__",
+          "__WIN_END__", "__WIN_START__", "__WIN_START_FULL__",
+          "__PAIR1_FROM__", "__PAIR1_TO__", "__PAIR2_FROM__", "__PAIR2_TO__")
 
 
 def render(text, values):
@@ -47,6 +49,21 @@ def token_values():
         values["__STREAM_MISPLACED__"] = str(s["misplaced"])
     except Exception as e:                                   # noqa: BLE001
         print(f"[!] 无法重放流式对账取占位符真值({e}), 流式三项比对降级")
+    # 日期类占位符取"当前锚"下的真值: 锚点默认=构建当日, 昨天的产物配今天的锚会被判 STALE
+    # (这正是想要的: 提醒重跑 build); 复现历史构建时两侧应同时钉锚(--anchor / METRICHUB_ANCHOR)。
+    try:
+        from datetime import timedelta
+        import simulator
+        a = simulator.ANCHOR
+        values["__WIN_END__"] = a.strftime("%m-%d")
+        values["__WIN_START__"] = (a - timedelta(days=13)).strftime("%m-%d")
+        values["__WIN_START_FULL__"] = (a - timedelta(days=13)).isoformat()
+        values["__PAIR1_FROM__"] = (a - timedelta(days=1)).strftime("%m-%d")
+        values["__PAIR1_TO__"] = a.strftime("%m-%d")
+        values["__PAIR2_FROM__"] = (a - timedelta(days=6)).strftime("%m-%d")
+        values["__PAIR2_TO__"] = (a - timedelta(days=5)).strftime("%m-%d")
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[!] 无法读取模拟器锚点({e}), 日期占位符比对降级")
     return values
 
 

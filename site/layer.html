@@ -50,7 +50,7 @@ async function loadMetric(name){
     const pts0=series.map((s,i)=>({i,v:s.value===null||s.value===undefined?null:+s.value}));
     const obs=pts0.filter(p=>p.v!==null&&!Number.isNaN(p.v));
     const max=Math.max(...obs.map(p=>p.v),1e-9);
-    // x 用序列下标而非日期数字: 窗口可能跨月(如 09-25~10-08), 按 dt.slice(8) 会画出折返线
+    // x 用序列下标而非日期数字: 窗口可能跨月(如 __WIN_START__~__WIN_END__), 按 dt.slice(8) 会画出折返线
     const pts=obs.map(p=>{
       const x=p.i/(series.length-1)*100, y=40-(p.v/max)*36;
       return `${x.toFixed(1)},${Math.max(y,4).toFixed(1)}`;

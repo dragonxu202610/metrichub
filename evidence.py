@@ -54,7 +54,11 @@ def main():
         print("[!] out/api/dashboard.json 不存在 —— 先运行 python build.py --fresh")
         return 1
     pages = {p.name: p.read_text(encoding="utf-8") for p in (ROOT / "site").glob("*.html")}
-    all_html = "\n".join(pages.values())
+    # "日期对 + 数字"的可核写法检查的是**渲染后的产物页**(out/): 源页里的日期是 __WIN_*__ 占位符,
+    # 渲染后才有真实日对可绑定; 产物缺页时退回源页(与旧行为一致)。
+    rendered = {p.name: p.read_text(encoding="utf-8") for p in (ROOT / "out").glob("*.html")} \
+        if (ROOT / "out").exists() else {}
+    all_html = "\n".join((rendered or pages).values())
     docs = "\n".join(p.read_text(encoding="utf-8") for p in
                      [ROOT / "README.md", ROOT / "PLAN-90D.md"] if p.exists())
 

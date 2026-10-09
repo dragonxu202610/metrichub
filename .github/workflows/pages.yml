@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "30 3 * * *"   # 每日重跑一次流水线, 确认七道门禁仍然可绿(数据窗口锚定在 2026-10-08, 产物确定)
+    - cron: "30 3 * * *"   # 每日重跑: 锚点默认=构建当日, 窗口随之前滚; 钉锚复现用 --anchor(见 simulator.py)
   workflow_dispatch:
 
 permissions:

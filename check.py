@@ -174,18 +174,16 @@ def check_contracts():
             warn(f"看板脚本读取 kpi.{field}, 但没有任何 KPI 项提供该字段(该分支不会渲染)")
     ok("dashboard.json 契约完整(含前端反向提取的图表键与 KPI 字段)")
 
-    # 数据窗口必须锚定在 simulator.ANCHOR。页面上的日期与数字是随源码一起提交的:
-    # 产物一旦跟着 runner 的日期/时区走(CI 用 UTC, 比本地少一天), 窗口整体前移,
-    # site/northstar.html 里 "10-07→10-08" 这类日期对在新数据里就不存在 ——
-    # evidence.py 的举证门禁会直接失败(CI 首跑就是这么挂的), 且每日 cron 会永远红。
+    # 数据窗口的锚定日: 锚点默认=构建当日(每日 cron 前滚), 产物里的 as_of 必须与"当次构建的锚"一致。
+    # 不一致说明产物过期(昨天构建的 out 配今天的锚)或构建时钉过别的锚 —— 两种都要显式暴露。
     try:
         sys.path.insert(0, str(ROOT))
         import simulator as _sim
         if dash.get("as_of") != _sim.ANCHOR.isoformat():
-            fail(f"dashboard.as_of={dash.get('as_of')!r} 与锚定日期 {_sim.ANCHOR} 不一致 —— "
-                 f"产物正在跟着系统日期漂移, 页面上的日期对与数字会失效")
+            fail(f"dashboard.as_of={dash.get('as_of')!r} 与当前锚定日 {_sim.ANCHOR} 不一致 —— "
+                 f"产物过期(重跑 python build.py --fresh)或需 --anchor 钉住复现窗口")
         else:
-            ok(f"数据窗口锚定在 {_sim.ANCHOR}(不随 runner 日期/时区漂移)")
+            ok(f"数据窗口锚定在 {_sim.ANCHOR}(与构建锚一致, 不随 runner 时区漂移)")
     except Exception as e:                                   # noqa: BLE001
         warn(f"无法导入 simulator 校验窗口锚定: {e}")
 
@@ -320,16 +318,18 @@ def check_cross_file(metrics):
                      f"仅维表有 {sorted(cost_models - sim_models)}")
             else:
                 ok(f"dim_model_cost seed 覆盖全部 {len(sim_models)} 个模型")
-        # 锚定日期的 dbt 默认值必须与模拟器一致: build.py 每次会用 --vars 覆盖,
-        # 但默认值漂移意味着"不传参的裸 dbt run"会算出另一个窗口的口径 —— 必须断言兜住。
+        # 锚定日期的 dbt 默认值钉在"参考复现锚"上: 真实构建由 build.py 以 --vars 传构建当日,
+        # 默认值只服务手工 dbt run 的开发者 —— 它必须指向文档化的参考窗口(REFERENCE_ANCHOR),
+        # 否则"不传参的裸 dbt run"会拿 today 当锚, 与任何已发布产物都对不上。
         import yaml as _yaml
         proj = _yaml.safe_load((ROOT / "dbt" / "dbt_project.yml").read_text(encoding="utf-8"))
         dbt_anchor = str((proj.get("vars") or {}).get("anchor_date", ""))
-        if dbt_anchor != simulator.ANCHOR.isoformat():
-            fail(f"dbt_project.yml 的 anchor_date={dbt_anchor!r} 与 simulator.ANCHOR="
-                 f"{simulator.ANCHOR} 不一致 —— 裸 dbt run 会算出错窗口的口径")
+        if dbt_anchor != simulator.REFERENCE_ANCHOR.isoformat():
+            fail(f"dbt_project.yml 的 anchor_date={dbt_anchor!r} 与参考复现锚 "
+                 f"simulator.REFERENCE_ANCHOR={simulator.REFERENCE_ANCHOR} 不一致 —— "
+                 f"裸 dbt run 会用错窗口")
         else:
-            ok(f"dbt 默认锚定日期与 simulator.ANCHOR 一致({dbt_anchor})")
+            ok(f"dbt 默认锚定日期钉在参考复现锚({dbt_anchor})")
     # 口径描述里的"承诺词"必须有对应实现, 或在 notes 里明确承认未实现
     promises = {"排除测试账号": ("test", "is_test", "NOT is_test"),
                 "仅对有花费的渠道": ("spend", "cac"),
@@ -365,9 +365,19 @@ def check_data(metrics):
     sys.path.insert(0, str(ROOT))
     from semantic import SemanticLayer
     import simulator                                    # 窗口锚(见 simulator.ANCHOR)
+    # --data 检查的窗口锚必须取**产物自己的锚**(dashboard.as_of), 不能取"今天的锚":
+    # 锚点默认=构建当日, 昨天 build 的产物配今天的锚会把全部日期对查询成空集, 门禁假红。
+    dash_p = ROOT / "out" / "api" / "dashboard.json"
+    try:
+        from datetime import date as _date
+        build_anchor = _date.fromisoformat(
+            json.loads(dash_p.read_text(encoding="utf-8"))["as_of"])
+    except Exception as e:                               # noqa: BLE001
+        warn(f"无法从 dashboard.as_of 读构建锚({e}), --data 检查退回当前锚 {simulator.ANCHOR}")
+        build_anchor = simulator.ANCHOR
     con = duckdb.connect(str(db), read_only=True)
     con.execute("SET threads TO 1")     # 与 build.py 同一口径: 并行浮点求和顺序不定, 会让断言抖
-    sl = SemanticLayer(con=con, anchor=simulator.ANCHOR)
+    sl = SemanticLayer(con=con, anchor=build_anchor)
     wmap = (semantic.WINDOWS if semantic else {"1d": 1, "7d": 7, "14d": 14, "30d": 30})
     # 序列末点必须等于同窗口的窗口聚合(±0.5%): 这一条能拦住"比率被逐日求和"这类画法错误
     for m in metrics:

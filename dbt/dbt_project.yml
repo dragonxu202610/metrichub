@@ -5,10 +5,10 @@ name: metrichub
 version: "1.0.0"
 profile: metrichub
 
-# 锚定日期的默认值: 真值来自 simulator.ANCHOR, build.py 每次构建用 --vars 显式传入;
-# 这里只留一个与 simulator 同步的默认, check.py 会断言两者不漂移。
-# 它取代了旧 build.py 里 "ELT.replace('current_date', ...)" 的字符串替换 ——
-# 口径参数显式进模型, 而不是跑前偷偷改 SQL 文本。
+# 锚定日期: 真实构建由 build.py 以 --vars 传"构建当日"(每日 cron 前滚窗口);
+# 这里的默认值钉在**参考复现锚** simulator.REFERENCE_ANCHOR(2026-10-08)上, 只服务手工 dbt run
+# —— check.py 会断言它不漂移。它取代了旧 build.py 里 "ELT.replace('current_date', ...)" 的
+# 字符串替换: 口径参数显式进模型, 而不是跑前偷偷改 SQL 文本。
 vars:
   anchor_date: "2026-10-08"
 

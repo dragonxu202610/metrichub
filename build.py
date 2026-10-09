@@ -184,7 +184,14 @@ def run_dbt_docs():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fresh", action="store_true")
+    ap.add_argument("--anchor", metavar="YYYY-MM-DD",
+                    help="钉定锚定日以逐字节复现历史构建(如 2026-10-08); 默认=构建当日, "
+                         "每日 cron 重建时窗口随之前滚")
     args = ap.parse_args()
+    if args.anchor:
+        # 锚点必须在任何使用前覆盖(simulator/dbt/语义层/streaming 都读它);
+        # 固定种子下锚点平移只平移日期标签、数值不变(见 simulator.py 头注释)
+        simulator.ANCHOR = date.fromisoformat(args.anchor)
 
     if args.fresh or not (ROOT / "data" / "users.jsonl").exists():
         simulator.main()
@@ -334,10 +341,20 @@ def main():
     shutil.copytree(ROOT / "site", OUT, dirs_exist_ok=True)
     run_dbt_docs()
     ss = stream_cmp["stats"]
+    a = simulator.ANCHOR
     tokens = {"__METRIC_COUNT__": str(len(sl.metrics)),
               "__STREAM_BATCH__": f"{ss['batch_total']:,}",
               "__STREAM_DROPPED__": str(ss["wm_dropped"]),
-              "__STREAM_MISPLACED__": str(ss["misplaced"])}
+              "__STREAM_MISPLACED__": str(ss["misplaced"]),
+              # 日期类占位符: 页面叙事绑定的是"相对锚点的日对/窗口端点", 锚点平移时数值不变、
+              # 只有这些标签跟着渲染 —— 页面结论与产物才不会因每日重建而失配
+              "__WIN_END__": a.strftime("%m-%d"),
+              "__WIN_START__": (a - timedelta(days=13)).strftime("%m-%d"),
+              "__WIN_START_FULL__": (a - timedelta(days=13)).isoformat(),
+              "__PAIR1_FROM__": (a - timedelta(days=1)).strftime("%m-%d"),
+              "__PAIR1_TO__": a.strftime("%m-%d"),
+              "__PAIR2_FROM__": (a - timedelta(days=6)).strftime("%m-%d"),
+              "__PAIR2_TO__": (a - timedelta(days=5)).strftime("%m-%d")}
     # 占位符渲染范围: 交付目录的 html + 仓库级 README(README 不发布, 但指标数是给人看的门面)。
     # README 的源就是仓库里的 README.md 本身, 所以渲染时把"字面量"回写成占位符形态再渲染 ——
     # 既保持源码里始终是 __METRIC_COUNT__(避免下次改指标数时源码与产物不一致), 又不必来回改写文件。

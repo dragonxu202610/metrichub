@@ -2,9 +2,10 @@
 """
 MetricHub 数据模拟器(简化版)
 生成 14 天「AI 视频平台」业务数据(参考真实形态: SEO/红人渠道、积分订阅、多模型).
-输出 data/*.jsonl —— 只做事实记录, 不做任何加工(加工是 build.py 的 ELT 职责).
+输出 data/*.jsonl —— 只做事实记录, 不做任何加工(加工是数仓层 dbt 的职责).
 """
 import json
+import os
 import random
 from datetime import date, timedelta
 from pathlib import Path
@@ -12,13 +13,23 @@ from pathlib import Path
 DATA = Path(__file__).parent / "data"
 DAYS = 14
 SEED = 20261008
-# 演示窗口锚定到固定日期, 不用 date.today()。
-# 为什么: 页面上的日期与数字是**随源码一起提交**的, 数据必须能在任何机器、任何时区、任何一天复现 ——
-#   · GitHub runner 用 UTC, 与本机(UTC+8)差一天 → 窗口整体前移, 页面里 "10-07→10-08" 这类日期对
-#     在新数据里根本不存在, evidence.py 的举证门禁直接失败(CI 首跑就是这么挂的);
-#   · 每日 cron 重放会让已发布的页面数字与产物不再一致, 门禁必然变红。
-# 变的应该是"你看它的那一天", 不是数据本身。
-ANCHOR = date(2026, 10, 8)
+# 演示窗口的锚定日 = "数据的今天"。
+# 默认取**构建当日**(date.today()), 让每日 cron 的重建真正把窗口前滚一天, 站点不"变旧";
+# 需要逐字节复现某个历史构建时, 用环境变量或 build.py --anchor 钉住, 如 --anchor 2026-10-08。
+# 为什么不能无脑 today: GitHub runner 用 UTC, 与本地(UTC+8)可能差一天 ——
+# 跨机器对同一构建复现时必须显式钉锚, "复现"才是被定义过的操作而不是碰运气。
+# 不变性(固定种子): 锚点平移只平移日期标签, 全部数值不变 —— rng 的调用序列与日期无关,
+# 活跃衰减/续订都只依赖相对天数。这让"页面上的历史结论"不随每日重建而失效。
+# REFERENCE_ANCHOR: 文档化的参考复现锚(README/基线/页面示例都指向它), dbt 的 anchor 默认值与它对齐。
+REFERENCE_ANCHOR = date(2026, 10, 8)
+
+
+def _default_anchor():
+    pinned = os.environ.get("METRICHUB_ANCHOR")
+    return date.fromisoformat(pinned) if pinned else date.today()
+
+
+ANCHOR = _default_anchor()
 
 # (渠道, 类型, 注册占比)
 CHANNELS = [("google-organic", "seo", .28), ("bing-organic", "seo", .06), ("reddit-organic", "seo", .05),
