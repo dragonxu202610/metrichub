@@ -7,22 +7,29 @@
 <link rel="stylesheet" href="assets/style.css">
 <style>
   .badge-demo{display:inline-block;font-size:10.5px;font-weight:700;color:var(--amber);
-              border:1px solid #e0cfa4;background:#fdf8ec;border-radius:4px;padding:0 7px;
-              vertical-align:2px;margin-left:8px;letter-spacing:1px}
+              border:1px solid #e0cfa4;background:var(--amber-soft);border-radius:999px;padding:1.5px 9px;
+              vertical-align:2px;margin-left:8px;letter-spacing:.5px}
   .scards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:16px 0}
   @media(max-width:840px){.scards{grid-template-columns:1fr}}
-  .scard{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:14px 16px}
-  .scard .n{font-family:var(--serif);font-size:26px;font-weight:700}
-  .scard .l{font-size:11.5px;color:var(--muted);letter-spacing:1px;margin-bottom:4px}
+  .scard{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+         padding:14px 16px;box-shadow:var(--shadow)}
+  .scard .n{font-size:26px;font-weight:750;font-variant-numeric:tabular-nums}
+  .scard .l{font-size:11.5px;color:var(--muted);letter-spacing:.5px;margin-bottom:4px}
   .scard .d{font-size:12px;color:var(--muted);margin-top:6px}
   .chart{width:100%;height:300px}
-  .flink-map{width:100%;border-collapse:collapse;font-size:12.6px;background:var(--card)}
-  .flink-map th{font-size:11.5px;letter-spacing:1px;color:var(--muted);text-align:left;
-                border-bottom:2px solid var(--line);padding:8px 10px;white-space:nowrap}
-  .flink-map td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:top}
-  .flink-map code{font-size:11.8px}
+  .flink-map{width:100%;border-collapse:collapse;font-size:12.6px;background:var(--surface);
+             border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:12px 0}
+  .flink-map th{font-size:11px;letter-spacing:.8px;color:var(--faint);text-align:left;
+                border-bottom:2px solid var(--line);padding:8px 12px;background:#fafbfd;white-space:nowrap}
+  .flink-map td{border-bottom:1px solid var(--line);padding:8px 12px;vertical-align:top}
+  .flink-map tr:last-child td{border-bottom:none}
+  .flink-map code{font-size:11.5px}
   .modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
   @media(max-width:840px){.modes{grid-template-columns:1fr}}
+  .mode{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+        padding:16px 20px;box-shadow:var(--shadow)}
+  .mode h4{font-size:14px;margin:0 0 8px}
+  .mode p{font-size:12.6px;color:var(--muted);margin:0}
 </style>
 <script>
 /* 图表库加载: 按序尝试多个 CDN, 全部失败则降级为数值表而非白屏(与看板同一套兜底) */
@@ -45,20 +52,12 @@ window.loadECharts=function(i){
 </script>
 </head>
 <body>
-<nav><div class="nav-in">
-  <span class="nav-brand">Metric<em>Hub</em></span>
-  <a class="item" href="index.html">总览</a>
-  <a class="item" href="business.html">业务解构</a>
-  <a class="item" href="northstar.html">北极星审计</a>
-  <a class="item" href="dashboard.html">看板</a>
-  <a class="item" href="layer.html">语义层</a>
-  <a class="item" href="ai.html">AI 问答</a>
-  <a class="item" href="sources.html">信源</a>
-  <a class="item on" href="realtime.html">流批对账</a>
-</div></nav>
-<main>
-  <div class="hero" style="padding-bottom:0">
-    <h1 style="font-size:26px">流批口径对账<span class="badge-demo">演示级 · 纯 Python 重放</span></h1>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">04 · Stream vs Batch</div>
+    <h1 style="font-size:24px">流批口径对账<span class="badge-demo">演示级 · 纯 Python 重放</span></h1>
     <p class="lead" style="font-size:14px">
     实时计算里"窗口、乱序、迟到"不是概念名词——每一种都对应一种<b>具体的数字偏差</b>。
     本页把任务流（锚定日前 3 天、__STREAM_BATCH__ 条）重放为加速事件流，
@@ -84,30 +83,30 @@ window.loadECharts=function(i){
   </div>
 
   <div class="modes">
-    <div class="vs bad" style="border:1px solid var(--line);border-radius:10px;background:var(--card);padding:16px 20px">
+    <div class="mode">
       <h4>偏差模式一：丢弃（watermark 语义）</h4>
-      <p style="font-size:12.6px;color:var(--muted)">窗口在 watermark 越过末端时关闭并 emit；
+      <p>窗口在 watermark 越过末端时关闭并 emit；
       此后到达的事件<b>不再计入任何窗口</b>。代价是流式累计 &lt; 批精确——
       本重放里即边缘重试（2~6 小时延迟）的 __STREAM_DROPPED__ 条。收益是：每个窗口一旦关闭就是终值，
       不会随后到数据翻案。</p>
     </div>
-    <div class="vs" style="border:1px solid var(--line);border-radius:10px;background:var(--card);padding:16px 20px">
+    <div class="mode">
       <h4>偏差模式二：错配（纯到达序）</h4>
-      <p style="font-size:12.6px;color:var(--muted)">没有事件时间语义时，事件只能按处理时间落桶：
+      <p>没有事件时间语义时，事件只能按处理时间落桶：
       迟到的事件被算进"现在"的窗口。总数不缺（__STREAM_BATCH__ 条一条不少），
       但 <b>__STREAM_MISPLACED__ 条放错了窗口</b>——日报的"整点分布"从此失真，且没有任何报警。</p>
     </div>
   </div>
 
-  <h2>每小时窗口 · 三口径对照</h2>
+  <h2 class="sec"><span class="no">1</span>每小时窗口 · 三口径对照</h2>
   <div id="chartMain" class="chart"></div>
-  <h2>每小时窗口 · 与批精确的偏差</h2>
+  <h2 class="sec"><span class="no">2</span>每小时窗口 · 与批精确的偏差</h2>
   <div id="chartDiff" class="chart"></div>
   <p class="small" style="color:var(--muted);font-size:12px">
   数据：<code>api/stream_compare.json</code>（构建期由 <code>streaming/replay.py</code> 确定性重放生成，固定种子）。
   图表库全部 CDN 失败时会在此降级为数值表。</p>
 
-  <h2>同一逻辑 → Flink 原语映射</h2>
+  <h2 class="sec"><span class="no">3</span>同一逻辑 → Flink 原语映射</h2>
   <table class="flink-map">
     <tr><th>本演示（纯 Python）</th><th>Flink 对应</th><th>说明</th></tr>
     <tr><td>按整点分桶（60 分钟）</td><td><code>TumblingEventTimeWindows.of(Time.hours(1))</code></td><td>滚动窗口：不重不漏</td></tr>
@@ -119,18 +118,19 @@ window.loadECharts=function(i){
     <tr><td>与批精确对账（守恒断言）</td><td>批模式 / 外部对账任务</td><td>流批一致性要<b>被验证</b>，不是被相信</td></tr>
   </table>
 
-  <div class="tip-inf" style="margin-top:16px">
-    <b>为什么这里不是真 Flink</b>：本样例的目的是把口径偏差<b>量化并可视化</b>（1 小时窗口、45 分钟容忍、
+  <div class="co co-warn" style="margin-top:16px">
+    <span class="cot">为什么这里不是真 Flink</span>
+    本样例的目的是把口径偏差<b>量化并可视化</b>（1 小时窗口、45 分钟容忍、
     6% 排队堆积 + 0.3% 边缘重试的注入参数全部公开可调，重放确定性可复现），而不是假装有一条生产流。
     生产链路的形态（Kafka → Flink → OLAP，乱序/迟到/状态大小的取舍）记录在 PLAN-90D 的实时层设计里；
-    真要落地时，本页的三口径对账就是那条链路的验收方法。
-  </div>
+    真要落地时，本页的三口径对账就是那条链路的验收方法。</div>
 
-  <footer>
+  <footer class="foot">
     <span>MetricHub · 流式结论必须与批口径对账 —— "丢弃"与"错配"是两种不同的病, 药方也不同</span>
-    <span><a href="layer.html">这些窗口的下游是语义层 →</a></span>
+    <span><a href="layer.html">这些窗口的下游是指标目录 →</a></span>
   </footer>
 </main>
+<script src="assets/nav.js"></script>
 <script>
 fetch('api/stream_compare.json').then(r=>r.json()).then(d=>{
   const ws=d.windows, s=d.stats;
@@ -141,17 +141,17 @@ fetch('api/stream_compare.json').then(r=>r.json()).then(d=>{
                 xAxis:{type:'category',data:lbl,axisLabel:{fontSize:10,interval:11,rotate:45}}};
     echarts.init(document.getElementById('chartMain')).setOption({...base,
       legend:{data:['批精确','watermark','纯到达序'],top:0,textStyle:{fontSize:11}},
-      yAxis:{type:'value'},
-      series:[{name:'批精确',type:'line',data:ws.map(w=>w.batch),symbol:'none',lineStyle:{width:2}},
-              {name:'watermark',type:'line',data:ws.map(w=>w.wm),symbol:'none',lineStyle:{width:1.4,opacity:.9}},
-              {name:'纯到达序',type:'line',data:ws.map(w=>w.arrival),symbol:'none',lineStyle:{width:1.2,opacity:.7}}]});
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#eceef2'}}},
+      series:[{name:'批精确',type:'line',data:ws.map(w=>w.batch),symbol:'none',lineStyle:{width:2,color:'#15181e'}},
+              {name:'watermark',type:'line',data:ws.map(w=>w.wm),symbol:'none',lineStyle:{width:1.4,opacity:.9,color:'#4f46e5'}},
+              {name:'纯到达序',type:'line',data:ws.map(w=>w.arrival),symbol:'none',lineStyle:{width:1.2,opacity:.7,color:'#a9700e'}}]});
     echarts.init(document.getElementById('chartDiff')).setOption({...base,
       legend:{data:['watermark−批(≤0,丢弃)','到达序−批(错配)'],top:0,textStyle:{fontSize:11}},
-      yAxis:{type:'value'},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#eceef2'}}},
       series:[{name:'watermark−批(≤0,丢弃)',type:'bar',data:ws.map(w=>w.wm-w.batch),
-               itemStyle:{color:'#c25462'}},
+               itemStyle:{color:'#d3382f'}},
               {name:'到达序−批(错配)',type:'bar',data:ws.map(w=>w.arrival-w.batch),
-               itemStyle:{color:'#c9a24b'}}]});
+               itemStyle:{color:'#a9700e'}}]});
     window.addEventListener('resize',()=>{document.querySelectorAll('.chart').forEach(el=>{
       const c=echarts.getInstanceByDom(el);c&&c.resize()})});
   }).catch(()=>degrade(ws));

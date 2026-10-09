@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>语义层构建 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">02 · Semantic Layer</div>
+    <h1>语义层构建</h1>
+    <p class="lead"><code>metrics.yaml</code> 是全站唯一事实源：<b>__METRIC_COUNT__ 个指标</b>的口径、粒度、可加性、
+    负责人、版本、争议与已知缺陷全部显式注册。引擎（<code>semantic.py</code>，约 116 行）提供三个能力：
+    <code>compile()</code> 把定义编译成 SQL、<code>query()</code> 是 AI 工具调用的底层、<code>ai_context()</code> 生成注入 LLM 的上下文。
+    生产对应物：dbt MetricFlow / Cube。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">1</span>构建流程：七步，每步有门禁</h2>
+  <p class="sec-sub">指标不是"写完就上线"——每一步的输出都是下一步的门禁输入，谁签字、机器查什么，全部显式。</p>
+  <div class="vsteps">
+    <div class="vstep"><div class="vn">1</div><div class="vb"><div class="vt">需求</div>
+      <div class="vd">业务问题 / 拆解树缺口 → 一句话口径 + 单位 + 粒度。basis 表不存在或埋点缺字段 → 先补数，不是先写 YAML（北极星树 2 个叶子"无定义"即此结论）。</div></div></div>
+    <div class="vstep"><div class="vn">2</div><div class="vb"><div class="vt">草案</div>
+      <div class="vd">写进 metrics.yaml。门禁：8 个必填字段、命名正则、group/window/unit 枚举、grain 必须显式声明。</div>
+      <div class="vg">check.py · 口径契约</div></div></div>
+    <div class="vstep"><div class="vn">3</div><div class="vb"><div class="vt">评审签约</div>
+      <div class="vd">定 owner、version=1、notes 记录争议与边界。"承诺 × 实现"检查：desc 里的承诺词（如"排除测试账号"）必须有实现或 notes 承认，否则告警"这句会被追问"。</div>
+      <div class="vg">check.py · 承诺×实现</div></div></div>
+    <div class="vstep"><div class="vn">4</div><div class="vb"><div class="vt">注册</div>
+      <div class="vd">北极星类受唯一性断言：approved 恰好 1 个，且全站文案不得把候选表述为"推荐北极星"——按 title 匹配而非 name（按 name 拼匹配串会恒真通过，比没有断言更危险）。</div>
+      <div class="vg">check.py · 北极星唯一性</div></div></div>
+    <div class="vstep gate"><div class="vn">5</div><div class="vb"><div class="vt">门禁验证</div>
+      <div class="vd">数据侧：序列非空、序列末点 ≈ 窗口聚合（容差 max(5%, 2pt)——拦"比率被逐日求和"）、ttfc 只剩 0/1440 即 FAIL（口径退化）、队列末点腰斩告警。</div>
+      <div class="vg">check.py --data · 七道门禁之一</div></div></div>
+    <div class="vstep gate"><div class="vn">6</div><div class="vb"><div class="vt">发布</div>
+      <div class="vd">build → 静态站 + api/*.json。catalog 条数 = 源条数（产物过期 FAIL）；每指标 grain/series_grain 与定义一致；产物严格 JSON（parse_constant 拒绝 Infinity/NaN）。</div>
+      <div class="vg">check.py · 前端×产物契约</div></div></div>
+    <div class="vstep"><div class="vn">7</div><div class="vb"><div class="vt">变更管理</div>
+      <div class="vd">口径修改 → version+1 且 notes 记录旧口径事故。compare_out 拦"改了源没 rebuild"；evidence 逐数字复算；verify_served 抓线上渲染。分歧未决 → 双口径并存（见第 3 节）。</div>
+      <div class="vg">三道产物侧门禁</div></div></div>
+  </div>
+
+  <h2 class="sec"><span class="no">2</span>指标定义规范：19 个字段，每个字段防一类事故</h2>
+  <p class="sec-sub">这张表是 <code>metrics.yaml</code> 的字段模型。"缺了会出的事故"全部是本项目数据上真实发生过的——规范不是理论清单，是事故清单的逆向工程。右列是 MetricFlow / Cube 的对应概念。</p>
+  <table class="tb">
+    <tr><th style="width:150px">字段</th><th>含义</th><th>缺了会出的事故（本项目实例）</th><th style="width:150px">MF / Cube 对应</th></tr>
+    <tr><td><code>name</code></td><td>唯一标识，AI 工具调用入口</td><td>重名 FAIL；非小写下划线 FAIL</td><td>metric / measure 名</td></tr>
+    <tr><td><code>title</code> <code>desc</code></td><td>人话名称 + 口径描述，注入 AI 上下文</td><td>desc 写"排除测试账号"而无实现 → 告警"会被追问"</td><td>description</td></tr>
+    <tr><td><code>group</code></td><td>6 业务域枚举（消费归属）</td><td>越出枚举 FAIL</td><td>Cube folders</td></tr>
+    <tr><td><code>owner</code></td><td>指标责任人（必填）</td><td>无人对口径负责 → 争议无裁决人</td><td>git CODEOWNERS</td></tr>
+    <tr><td><code>version</code></td><td>口径版本，变更必须 +1</td><td>paying_users v1→v3（含退款→只计非退款）：无版本则"口径漂移"不可追溯</td><td>靠 git，无内建字段</td></tr>
+    <tr><td><code>basis</code></td><td>物理表，仅限 DWD/DWS 的 dbt 模型</td><td>语义层直捣业务库 → 绕过行级测试与守恒断言</td><td>semantic model 表来源</td></tr>
+    <tr><td><code>date_field</code></td><td>时间对齐列，默认 dt</td><td>新用户指标按事件 dt 取窗会把老用户算进"新注册"</td><td>time dimension</td></tr>
+    <tr><td><code>expr</code></td><td>聚合表达式，编译进 SELECT</td><td>ttfc 按日期相减只剩 0/1440 两值 → "分钟中位数"退化成布尔量（专项 FAIL）</td><td>measure agg + expr</td></tr>
+    <tr><td><code>dimensions</code></td><td>可下钻白名单</td><td>引擎对非法维度<b>抛错而非静默丢弃</b>——静默 = 拿总值冒充分组值，"错了但看起来对"是最危险的失败模式</td><td>dimension / segment</td></tr>
+    <tr><td><code>default_time</code></td><td>AI 未指明窗口时的默认值</td><td>隐式默认：有人以为 30d 有人以为 7d</td><td>查询参数</td></tr>
+    <tr><td><code>grain</code></td><td>window=窗口单值 / daily=逐日值，必须显式</td><td>同名指标"周值 13,542 vs 日值 2,469"歧义：名称含"周"被当逐日值画</td><td>查询侧决定（本 spec 更收紧）</td></tr>
+    <tr><td><code>series_grain</code></td><td>daily 可拆日 / none 拆分语义不成立</td><td>北极星（去重人数）逐日相加 = 人·天：4,278 显示成 7,142；引擎直接拒绝拆日请求</td><td>无直接对应</td></tr>
+    <tr><td><code>additivity</code></td><td>可加 / 不可加（序列画法 + 维度求和判据）</td><td>窗口比率被逐日平均：日均 3.14 vs 窗口 12.90——末点校验 FAIL</td><td>non_additive_dimension</td></tr>
+    <tr><td><code>unit</code></td><td>count/percent/usd/min/ratio</td><td>ROAS 是"倍"不是美元：unit 缺则前端格式化与 AI 读数全错</td><td>format</td></tr>
+    <tr><td><code>notes</code></td><td>治理痕迹：争议、旧口径事故、已知缺陷</td><td>缺陷藏在注释外 → "人知道不可信、AI 拿它当结论"；ai_context 按关键词整行注入 ⚠</td><td>git PR/文档（本项目进机器可读上下文）</td></tr>
+    <tr><td><code>north_star_status</code></td><td>approved 唯一 / proposed / rejected</td><td>两个 approved → "总分是哪一格"要翻五个文件</td><td>certified 标记</td></tr>
+    <tr><td><code>cohort_maturity_days</code></td><td>队列观察期（激活=1，7d 类=7）</td><td>漏写 → 序列末点"下滑"被读成转化崩塌（实为日历截断）；ai_context 注入 ⚠</td><td>offset window metric</td></tr>
+    <tr><td><code>rolling_distinct_on</code></td><td>滚动去重列（北极星=user_id）</td><td>漏写 + 去重类 → 趋势只能逐日相加（人·天事故）</td><td>cumulative metric</td></tr>
+    <tr><td>（惯例）nullif 分母</td><td>一切比率分母写 <code>nullif(·,0)</code></td><td>分母 0 → inf → json.dumps 写成 Infinity → 非法 JSON → 前端整页抛错；产物侧再压一道 + 严格校验</td><td>引擎层数值处理</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">3</span>口径争议治理：分歧可见，而非互斥</h2>
+  <p class="sec-sub">不裁决唯一"正确口径"——每个口径独立注册（独立 name + version + notes 互链），看板并排展示、AI 上下文同时注入，消费端按问题选口径。</p>
+  <div class="grid g2">
+    <div class="dcard"><div class="dh"><b>激活定义</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>activation_1d</b>（v2，注册当日首次成功）——增长派</li>
+      <li><b>activation_7d</b>（观察期 7 天）——产品派</li>
+      <li>合并必然有人被代表；各带 cohort_maturity_days 标注末点截断</li></ul></div>
+    <div class="dcard"><div class="dh"><b>渠道归因</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>first_touch</b> $2,829——看获客质量</li>
+      <li><b>linear</b> $1,693——看助攻价值</li>
+      <li>notes 显式记录：线性口径在演示数据上「不可用于预算决策」（40% 收入无归属）</li></ul></div>
+  </div>
+  <div class="co co-warn"><span class="cot">反例：什么时候不并存</span>
+  model_gross_margin v2 强制现金口径（33.1% → 12.9%），因旧口径已被<b>证伪</b>（白送额度的燃烧记成收入）——
+  这不是分歧而是错误，升版替换、notes 留痕即可追溯。<b>分歧并存，错误升版——两者的区别是治理判断，不是技术判断。</b></div>
+
+  <h2 class="sec"><span class="no">4</span>认证分级 <span class="tg-plan">规划</span></h2>
+  <p class="sec-sub">metrics.yaml 尚无指标级 status（north_star_status 的 approved/proposed/rejected 词汇可平移）。规划三级，门禁随之扩展：</p>
+  <table class="tb">
+    <tr><th style="width:120px">级别</th><th>语义</th><th>门禁扩展</th></tr>
+    <tr><td><span class="tg-ok">certified</span></td><td>评审签约 + 数据侧验证通过，进看板/AI 默认目录</td><td>owner + notes + 数据侧三证齐全才可标注</td></tr>
+    <tr><td><span class="tg-plan">proposed</span></td><td>有定义、未过数据侧验证</td><td>ai_context 标"未认证，引用须声明"；不进看板默认 KPI</td></tr>
+    <tr><td><span class="tg-bad">deprecated</span></td><td>已被替代，记 successor</td><td>name 保留禁止复用（防历史报表复活旧口径）；校验 successor 存在</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">5</span>与 dbt 数仓层的分工边界</h2>
+  <div class="grid g2">
+    <div class="dcard"><div class="dh"><b>dbt：表怎么来</b><span class="tg-ok">已实现</span></div>
+      <ul><li>分层建模（staging/DWD/DWS）、行级测试、ref() 血缘</li>
+      <li>2 项守恒断言（现金精确、分摊 ±$0.05 回现金）</li>
+      <li>治理痕迹：schema.yml 注释 + 测试挂载在<a href="dbt-docs/index.html">血缘图</a>上</li></ul></div>
+    <div class="dcard"><div class="dh"><b>语义层：指标怎么算</b><span class="tg-ok">已实现</span></div>
+      <ul><li>口径 / 粒度 / 可加性 / 版本 / 争议记录</li>
+      <li>治理痕迹：notes + 北极星唯一性 + 承诺×实现检查</li>
+      <li>互引：basis 只能指 dbt 模型；改口径需确认 dbt 测试仍守恒</li></ul></div>
+  </div>
+
+  <h2 class="sec"><span class="no">6</span>能力边界诚实表</h2>
+  <table class="tb">
+    <tr><th style="width:210px">不支持</th><th>当前绕法</th><th style="width:230px">生产对应物</th></tr>
+    <tr><td>派生 / 比率指标（指标间运算）</td><td>双聚合手写进单条 expr（creations_per_active_user）</td><td>MetricFlow derived/ratio metric</td></tr>
+    <tr><td>跨模型 join</td><td>dbt 预 join 成宽表（dwd_task_ch 才让北极星可按渠道归因）</td><td>MetricFlow entity join / Cube joins</td></tr>
+    <tr><td>时间 spine / 任意窗口</td><td>窗口固定 {1d,7d,14d,30d}，超出报错</td><td>time spine 模型 + 任意粒度</td></tr>
+    <tr><td>行/列级权限</td><td>无（单租户演示，见<a href="apps.html">应用层</a>的治理落位）</td><td>Cube data access policies</td></tr>
+    <tr><td>方言无关 SQL</td><td>expr 是 DuckDB 片段，换引擎即失效</td><td>编译到各方言</td></tr>
+    <tr><td>实时出口 / MCP</td><td>AI 问答为构建时 JSON 快照（<a href="ai.html">AI 页</a>已标注）</td><td>Cube REST/GraphQL + MCP</td></tr>
+  </table>
+
+  <div class="co co-note"><span class="cot">试一试</span>
+  这 __METRIC_COUNT__ 条定义的完整渲染在<a href="layer.html">指标目录</a>：逐条展开口径公式、时间序列、维度分解与争议记录；
+  更底层的表从哪来、测试挂在哪，见 <a href="dbt-docs/index.html">dbt 血缘图</a>。</div>
+
+  <footer class="foot">
+    <span>MetricHub · 规范 = 事故清单的逆向工程 —— 每个字段都防一类真实发生过的错</span>
+    <span><a href="metrics.html">下一章：指标体系与北极星 →</a></span>
+  </footer>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

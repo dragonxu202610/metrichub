@@ -3,75 +3,170 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MetricHub · 受 AI 消费的指标语义层</title>
+<title>总览 · MetricHub</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-<nav><div class="nav-in">
-  <span class="nav-brand">Metric<em>Hub</em></span>
-  <a class="item on" href="index.html">总览</a>
-  <a class="item" href="business.html">业务解构</a>
-  <a class="item" href="northstar.html">北极星审计</a>
-  <a class="item" href="dashboard.html">看板</a>
-  <a class="item" href="layer.html">语义层</a>
-  <a class="item" href="ai.html">AI 问答</a>
-  <a class="item" href="sources.html">信源</a>
-  <a class="item" href="realtime.html">流批对账</a>
-  <span class="right">模拟数据 · 仅作架构演示</span>
-</div></nav>
-<main>
-  <div class="hero">
-    <div class="eyebrow">SEMANTIC LAYER, AS THE SOURCE OF TRUTH</div>
-    <h1>一次定义，处处一致。</h1>
-    <p class="lead">MetricHub 是一个<b>受 AI 消费的指标语义层</b>：__METRIC_COUNT__ 个业务指标以 YAML 声明为唯一事实源，
-    编译成 SQL 供看板取数，同时作为上下文与工具提供给 AI 问答——口径歧义在机器层消灭，而不是靠人记忆。业务设定来自对一类 AI 视频平台的<b>公开信息推断</b>（见「业务解构」页，已声明供检验）。</p>
-    <div class="meta" id="chips">
-      <span class="chip">指标 <b>__METRIC_COUNT__</b> 个</span>
-      <span class="chip">业务域 <b>6</b> 个</span>
-      <span class="chip">消费端 <b>看板 / API / AI</b></span>
-      <span class="chip">核心引擎 <b>~116 行 Python</b></span>
-      <span class="chip">业务画像 <b>推断·已声明</b></span>
-      <span class="chip">北极星 <b>已审计 · 含推翻条件</b></span>
-    </div>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">Overview · 总览</div>
+    <h1>一套为 AI 消费而建的指标平台</h1>
+    <p class="lead">面向「多模型聚合 + 积分订阅制」AI 视频平台的业务形态（模拟数据，业务设定的公开出处可核）：
+    <b>__METRIC_COUNT__ 个业务指标</b>以 YAML 声明为唯一事实源，向下编译 SQL 查 dbt 数仓，
+    向上供看板、API 与 AI 问答三处同源消费——口径歧义在机器层消灭，而不是靠开会达成默契。</p>
   </div>
 
-  <h2 class="sec"><span class="no">01</span>它解决什么问题</h2>
-  <p class="desc">背景业务是一个多模型聚合、积分订阅制的 AI 视频平台（模拟数据）。3-4 人的数据团队服务全公司时，最常见的死循环是——</p>
-  <div class="grid3">
-    <div class="card"><h3>口径分裂</h3><p>三个团队三个"付费用户"，会上数字打架。口径写在文档里靠人遵守，会腐烂；写进代码里靠机器执行，不会。</p></div>
-    <div class="card"><h3>取数排队</h3><p>每个需求都是手写 SQL，需求量随业务团队增长而数据团队不变。语义层让消费端是机器：看板、接口、AI 都引用同一份定义。</p></div>
-    <div class="card"><h3>AI 答数不可信</h3><p>裸 text-to-SQL 会"自信且不可复现"地编数字——同义词、隐式默认、时间语义全是语义问题。语义层是 AI 答数的治理前提。</p></div>
+  <div class="stats">
+    <div class="stat acc"><div class="n">__METRIC_COUNT__</div><div class="l">已注册指标（YAML 单一事实源）</div></div>
+    <div class="stat"><div class="n">16</div><div class="l">dbt 模型（staging/DWD/DWS）</div></div>
+    <div class="stat"><div class="n">76</div><div class="l">行级测试 + 守恒断言</div></div>
+    <div class="stat"><div class="n">6</div><div class="l">数据域（按业务过程划分）</div></div>
+    <div class="stat"><div class="n">7</div><div class="l">交付门禁（不过不发布）</div></div>
+    <div class="stat"><div class="n">8</div><div class="l">页面（含旧版归档切换）</div></div>
   </div>
 
-  <h2 class="sec"><span class="no">02</span>怎么工作</h2>
-  <div class="grid3">
-    <div class="card"><h3>① 定义</h3><p><code>metrics.yaml</code> 里每个指标声明口径公式、可选维度、默认时间窗、单位与版本号。口径争议（如激活的 1d/7d 两派）双注册，让分歧可见而非互斥。</p></div>
-    <div class="card"><h3>② 编译</h3><p>语义层引擎把指标名 + 维度 + 时间窗编译为 SQL，在数仓上执行。看板上的每个数字都能追溯回一条 YAML 定义——改一处，处处变。</p></div>
-    <div class="card"><h3>③ 消费</h3><p>三处消费同一份定义：看板（编译 SQL）、API（JSON 快照）、AI 问答（L1 注入指标定义 + L2 调用 <code>query_metric</code> 工具而非生成 SQL）。</p></div>
+  <div class="co co-warn"><span class="cot">诚实边界（先读这个）</span>
+  ①<b>数据是确定性模拟</b>：固定随机种子、14 天窗口、锚点可复现，所有数字只演示机制不反映任何公司真实经营；
+  ②<b>AI 问答是构建时预计算的链路快照</b>，页面不发生模型调用（<a href="ai.html">AI 页</a>有醒目标注）；
+  ③<b>流式样例是演示级纯 Python 重放</b>，生产对应 Flink（<a href="realtime.html">流批对账页</a>给了原语映射表）；
+  ④每条业务设定的出处按「事实/推断/估算/假设」四类标注在<a href="sources.html">公开信源</a>页。</div>
+
+  <h2 class="sec"><span class="no">01</span>为什么：三类经典事故，一个结构解法</h2>
+  <div class="grid g3">
+    <div class="dcard"><div class="dh"><b>口径分裂</b></div>
+      <ul><li>财务看订单：现金口径毛利 <b>12.9%</b></li>
+      <li>模型组看消耗：积分燃烧口径 <b>33.1%</b></li>
+      <li>同一个会，两个「公司毛利」</li></ul></div>
+    <div class="dcard"><div class="dh"><b>取数排队</b></div>
+      <ul><li>每个问题都是一张临时工单</li>
+      <li>口径藏在取数人的脑子里</li>
+      <li>人走了，口径跟着消失</li></ul></div>
+    <div class="dcard"><div class="dh"><b>AI 答数不可信</b></div>
+      <ul><li>Text2SQL 语法全对、口径全错</li>
+      <li>错得快、错得像、还会被引用</li>
+      <li>AI 越强，事故越大</li></ul></div>
+  </div>
+  <div class="co co-good"><span class="cot">解法：口径即代码</span>
+  指标定义（含粒度、可加性、负责人、版本、已知缺陷）全部显式注册进 <code>metrics.yaml</code>；
+  语义层引擎把它编译成 SQL——看板、API、AI 调的是同一条编译产物。
+  <b>单一事实源不是承诺一致，是结构上无法不一致。</b></div>
+
+  <h2 class="sec"><span class="no">02</span>总体架构：一条链路，治理贯穿</h2>
+  <div class="arch">
+  <svg viewBox="0 0 940 400" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/>
+      </marker>
+      <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5"/>
+      </marker>
+    </defs>
+    <!-- 主链路五层 -->
+    <g font-size="12.5">
+      <rect x="14" y="46" width="150" height="118" rx="10" fill="#fafbfd" stroke="#d4d9e2" stroke-dasharray="5 3"/>
+      <text x="89" y="68" text-anchor="middle" font-weight="700" fill="#15181e">业务系统（模拟）</text>
+      <text x="89" y="92" text-anchor="middle" fill="#5f6875" font-size="11.5">订单 · 任务 · 事件</text>
+      <text x="89" y="110" text-anchor="middle" fill="#5f6875" font-size="11.5">积分 · 触点 · 花费</text>
+      <text x="89" y="134" text-anchor="middle" fill="#8b93a1" font-size="10.5">固定种子 · 确定性生成</text>
+
+      <rect x="208" y="46" width="150" height="118" rx="10" fill="#fafbfd" stroke="#d4d9e2"/>
+      <text x="283" y="68" text-anchor="middle" font-weight="700" fill="#15181e">ODS</text>
+      <text x="283" y="92" text-anchor="middle" fill="#5f6875" font-size="11.5">7 × JSONL</text>
+      <text x="283" y="112" text-anchor="middle" fill="#8b93a1" font-size="10.5">只记事实 · 不加工</text>
+      <text x="283" y="132" text-anchor="middle" fill="#8b93a1" font-size="10.5">可整体丢弃再生</text>
+
+      <rect x="402" y="30" width="188" height="150" rx="10" fill="#ffffff" stroke="#4f46e5" stroke-width="1.4"/>
+      <text x="496" y="52" text-anchor="middle" font-weight="700" fill="#3c34ad">dbt 数仓</text>
+      <text x="496" y="74" text-anchor="middle" fill="#5f6875" font-size="11.5">staging → DWD → DWS</text>
+      <text x="496" y="92" text-anchor="middle" fill="#5f6875" font-size="11.5">16 模型 · ref() 血缘</text>
+      <text x="496" y="112" text-anchor="middle" fill="#0e8a4d" font-size="11">74 测试 + 2 守恒断言</text>
+      <text x="496" y="132" text-anchor="middle" fill="#8b93a1" font-size="10.5">单线程 · 逐字节可复现</text>
+      <text x="496" y="152" text-anchor="middle" fill="#8b93a1" font-size="10.5">dim_model_cost = 定价单源</text>
+
+      <rect x="634" y="30" width="164" height="150" rx="10" fill="#eef0ff" stroke="#4f46e5" stroke-width="1.6"/>
+      <text x="716" y="52" text-anchor="middle" font-weight="700" fill="#3c34ad">语义层</text>
+      <text x="716" y="72" text-anchor="middle" fill="#3c34ad" font-size="11.5">metrics.yaml · __METRIC_COUNT__ 指标</text>
+      <text x="716" y="92" text-anchor="middle" fill="#5f6875" font-size="11.5">compile → SQL</text>
+      <text x="716" y="110" text-anchor="middle" fill="#5f6875" font-size="11.5">粒度 · 可加性 · 版本</text>
+      <text x="716" y="128" text-anchor="middle" fill="#5f6875" font-size="11.5">负责人 · 争议 · 已知缺陷</text>
+      <text x="716" y="148" text-anchor="middle" fill="#8b93a1" font-size="10.5">ai_context() 注入 L1</text>
+
+      <rect x="842" y="30" width="86" height="150" rx="10" fill="#fafbfd" stroke="#d4d9e2"/>
+      <text x="885" y="52" text-anchor="middle" font-weight="700" fill="#15181e">消费</text>
+      <text x="885" y="76" text-anchor="middle" fill="#5f6875" font-size="11">看板</text>
+      <text x="885" y="94" text-anchor="middle" fill="#5f6875" font-size="11">目录</text>
+      <text x="885" y="112" text-anchor="middle" fill="#5f6875" font-size="11">API JSON</text>
+      <text x="885" y="130" text-anchor="middle" fill="#5f6875" font-size="11">AI 问答</text>
+      <text x="885" y="150" text-anchor="middle" fill="#8b93a1" font-size="10">MCP（规划）</text>
+    </g>
+    <!-- 主链路箭头 -->
+    <g stroke="#8b93a1" stroke-width="1.4" fill="none">
+      <line x1="164" y1="105" x2="204" y2="105" marker-end="url(#arr)"/>
+      <line x1="358" y1="105" x2="398" y2="105" marker-end="url(#arr)"/>
+      <line x1="590" y1="105" x2="630" y2="105" marker-end="url(#arr)"/>
+      <line x1="798" y1="105" x2="838" y2="105" marker-end="url(#arr)"/>
+    </g>
+    <!-- 治理贯穿带 -->
+    <g font-size="12">
+      <rect x="14" y="268" width="914" height="96" rx="10" fill="#eef0ff" fill-opacity=".55" stroke="#4f46e5" stroke-dasharray="6 3"/>
+      <text x="471" y="290" text-anchor="middle" font-weight="700" fill="#3c34ad">数据治理（贯穿每一层，不是单独一步）</text>
+      <g font-size="11.5" fill="#3c34ad" text-anchor="middle">
+        <text x="120" y="318" font-weight="650">质量</text><text x="120" y="336" fill="#5f6875" font-size="10.5">六维 × 测试断言</text>
+        <text x="285" y="318" font-weight="650">生命周期</text><text x="285" y="336" fill="#5f6875" font-size="10.5">分层保留 · 全量幂等重建</text>
+        <text x="450" y="318" font-weight="650">监控</text><text x="450" y="336" fill="#5f6875" font-size="10.5">七道门禁 = 发布前告警</text>
+        <text x="615" y="318" font-weight="650">元数据</text><text x="615" y="336" fill="#5f6875" font-size="10.5">spec 字段 + 血缘图</text>
+        <text x="780" y="318" font-weight="650">安全</text><text x="780" y="336" fill="#5f6875" font-size="10.5">现状诚实声明 + 规划</text>
+      </g>
+      <text x="471" y="356" text-anchor="middle" fill="#8b93a1" font-size="10.5">落位详情见各章「治理」小节：质量映射表 → 业务域页 · 生命周期 → 语义层页 · 监控对应物 → 服务页 · 权限 → 应用页</text>
+    </g>
+    <g stroke="#4f46e5" stroke-width="1.2" fill="none" stroke-dasharray="4 3" opacity=".8">
+      <line x1="89" y1="164" x2="89" y2="264" marker-end="url(#arrg)"/>
+      <line x1="283" y1="164" x2="283" y2="264" marker-end="url(#arrg)"/>
+      <line x1="496" y1="180" x2="496" y2="264" marker-end="url(#arrg)"/>
+      <line x1="716" y1="180" x2="716" y2="264" marker-end="url(#arrg)"/>
+      <line x1="885" y1="180" x2="885" y2="264" marker-end="url(#arrg)"/>
+    </g>
+  </svg>
+  </div>
+  <p class="tb-note">生产对应物：dbt（数仓）+ dbt MetricFlow / Cube（语义层 + API/MCP）+ BI / AI Agent（消费）——
+  本项目用轻量等价物把每层的职责与治理讲穿，工具可替换、方法不变。</p>
+
+  <h2 class="sec"><span class="no">03</span>章节导航：按「业务 → 数据 → 指标 → 服务 → 应用 → AI」构建</h2>
+  <div class="grid g3">
+    <a class="dcard" href="domains.html" style="text-decoration:none"><div class="dh"><b>01 业务结构与数据域</b><span class="tg-plan">重构版</span></div>
+      <ul><li>6 个数据域（按业务过程切，不按组织切）</li><li>总线矩阵：一致性维度 ◆/△ 现状</li><li>5 个烟囱口径冲突案例与结构解法</li><li>质量六维 × 测试断言映射表</li></ul></a>
+    <a class="dcard" href="semantic.html" style="text-decoration:none"><div class="dh"><b>02 语义层构建</b><span class="tg-plan">重构版</span></div>
+      <ul><li>构建流程七步：需求→签约→注册→门禁→发布</li><li>19 个 spec 字段：缺了会出什么事故</li><li>双口径争议治理 + 认证分级（规划）</li><li>与 dbt 的分工边界、能力诚实表</li></ul></a>
+    <a class="dcard" href="metrics.html" style="text-decoration:none"><div class="dh"><b>03 指标体系与北极星</b><span class="tg-plan">重构版</span></div>
+      <ul><li>北极星指标树：获取→激活→黏性→深度→变现</li><li>护栏 + 反向指标：防「拉高北极星伤公司」</li><li>北极星审计结论与证伪条件</li><li>31 指标健康度盘点（孤儿/降级直说）</li></ul></a>
+    <a class="dcard" href="services.html" style="text-decoration:none"><div class="dh"><b>04 数据服务场景</b><span class="tg-plan">重构版</span></div>
+      <ul><li>6 个决策场景：问题→指标→口径陷阱→动作</li><li>七道门禁 ↔ 生产监控对应物</li><li>可观测性四件套（规划）</li></ul></a>
+    <a class="dcard" href="apps.html" style="text-decoration:none"><div class="dh"><b>05 应用层</b><span class="tg-plan">重构版</span></div>
+      <ul><li>看板 / 目录 / API 契约 / 静态交付</li><li>权限与安全：现状与生产做法</li></ul></a>
+    <a class="dcard" href="ai.html" style="text-decoration:none"><div class="dh"><b>06 AI 问答 · Text2SQL · AI 开发</b><span class="tg-plan">重构版</span></div>
+      <ul><li>L1/L2/L3 三层递进 + 五问完整链路</li><li>裸 Text2SQL 五类失败 × 架构关闭</li><li>AI 编程提效：本项目怎么被建出来</li></ul></a>
   </div>
 
-  <h2 class="sec"><span class="no">03</span>七个入口</h2>
-  <div class="toc">
-    <a href="business.html"><span class="em">◧</span><b>业务解构</b><p>推断画像：业务域 / 团队构成 / 北极星 / 阶段诊断——本站的地基</p></a>
-    <a href="northstar.html"><span class="em">⌖</span><b>北极星审计</b><p>把推荐的北极星当假设来审：口径语义 / 拆解树覆盖率 / 可归因性 / 推翻条件</p></a>
-    <a href="dashboard.html"><span class="em">◧</span><b>指标看板</b><p>北极星 / 模型毛利 / 双口径渠道归因——每个数字背后是同一份 YAML</p></a>
-    <a href="layer.html"><span class="em">❖</span><b>语义层目录</b><p>__METRIC_COUNT__ 个指标的口径、公式、维度、粒度、版本与争议记录，可展开试查</p></a>
-    <a href="ai.html"><span class="em">✦</span><b>AI 问答演示</b><p>五个真实问题：注入了什么上下文、调用了什么工具、裸 SQL 会错在哪</p></a>
-    <a href="sources.html"><span class="em">◫</span><b>公开信源</b><p>每条业务设定的出处可点开核对：事实(有源) / 推断(标注) / 估算(注明时点) / 假设(声明)</p></a>
-    <a href="realtime.html"><span class="em">≋</span><b>流批对账</b><p>同一条流三种口径：批精确 / watermark / 纯到达序——丢弃与错配是两种不同的病</p></a>
+  <h2 class="sec"><span class="no">04</span>如何验证这个站点（不信任，就验证）</h2>
+  <div class="vsteps">
+    <div class="vstep"><div class="vn">1</div><div class="vb"><div class="vt">查信源</div>
+      <div class="vd"><a href="sources.html">公开信源页</a>——业务画像每条设定有出处，事实与推断分开标注，源间矛盾如实记录。</div></div></div>
+    <div class="vstep"><div class="vn">2</div><div class="vb"><div class="vt">查口径</div>
+      <div class="vd"><a href="layer.html">指标目录</a>逐条展开口径公式、粒度、负责人、争议记录；<a href="dbt-docs/index.html">dbt 血缘图</a>可点开看表从哪来、测试挂在哪。</div></div></div>
+    <div class="vstep"><div class="vn">3</div><div class="vb"><div class="vt">查数字</div>
+      <div class="vd">页面引用的每个数字由 <code>evidence.py</code> 从 <code>api/*.json</code> 复算，弹性论断绑定到具体日期对；七道门禁在 CI 里跑，不过不发布。</div></div></div>
+    <div class="vstep gate"><div class="vn">4</div><div class="vb"><div class="vt">查可复现</div>
+      <div class="vd"><code>python build.py --fresh --anchor 2026-10-08</code> 可逐字节重放任何历史构建——固定种子下锚点平移只动日期标签，数值不变。</div></div></div>
   </div>
 
-  <h2 class="sec"><span class="no">04</span>一个可以直接验证的细节</h2>
-  <div class="card">
-    <p style="font-size:14px;color:var(--ink)">看板与 AI 问答给出的是<b>同一个数字</b>——因为它们跑的是同一条由 YAML 编译出来的 SQL。
-    打开 <a href="ai.html">AI 问答</a> 里"哪个模型在亏钱"，再对照 <a href="dashboard.html">看板</a>的模型毛利表：
-    Veo 3.1 都是 <span class="neg">负毛利</span>（模拟数据，单价为公开定价的粗略估算）。这正是"单一事实源"的含义：不是承诺一致，是结构上无法不一致。</p>
-  </div>
-
-  <footer>
-    <span>MetricHub · 数据为本地模拟生成（14 天 · 参考真实业务形态）· 核心依赖仅 DuckDB + PyYAML</span>
-    <span>生产对应物：dbt MetricFlow / Cube（语义层 + MCP）</span>
+  <footer class="foot">
+    <span>MetricHub v2 · 数据为本地模拟 · 核心依赖 DuckDB + PyYAML + dbt（构建期），产物站零依赖</span>
+    <span><a href="domains.html">从业务结构开始 →</a></span>
   </footer>
 </main>
+<script src="assets/nav.js"></script>
 </body>
 </html>

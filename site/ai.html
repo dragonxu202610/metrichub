@@ -3,56 +3,88 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 问答 · MetricHub</title>
+<title>AI 问答 · Text2SQL · AI 开发 · MetricHub</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-<nav><div class="nav-in">
-  <span class="nav-brand">Metric<em>Hub</em></span>
-  <a class="item" href="index.html">总览</a>
-  <a class="item" href="business.html">业务解构</a>
-  <a class="item" href="northstar.html">北极星审计</a>
-  <a class="item" href="dashboard.html">看板</a>
-  <a class="item" href="layer.html">语义层</a>
-  <a class="item on" href="ai.html">AI 问答</a>
-  <a class="item" href="sources.html">信源</a>
-  <a class="item" href="realtime.html">流批对账</a>
-  <span class="right">L1 上下文注入 + L2 工具调用</span>
-</div></nav>
-<main>
-  <div class="hero" style="padding-bottom:0">
-    <h1 style="font-size:26px">当 AI 遇到指标</h1>
-    <p class="lead" style="font-size:14px">AI 编程工具让"写 SQL"的成本归零，反而放大了语义事故：<b>语法正确但口径错误</b>的查询如今秒出、秒执行、秒扩散。
-    所以语义层的优先级被 AI 提高了，不是降低了。下面是五个真实问题的完整链路——每一步都是可追溯的。</p>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">06 · AI Consumption</div>
+    <h1>AI 问答 · Text2SQL · AI 开发</h1>
+    <p class="lead">AI 编程工具让"写 SQL"的成本归零，反而放大了语义事故：<b>语法正确但口径错误</b>的查询如今秒出、秒执行、秒扩散。
+    所以语义层的优先级被 AI 提高了，不是降低了。本章三件事：AI 怎么被喂口径（L1/L2）、
+    裸 Text2SQL 错在哪（五类失败对照）、这个站本身怎么被 AI 建出来（AI 编程提效）。</p>
   </div>
 
-  <h2 class="sec"><span class="no">01</span>三层递进</h2>
-  <div class="lvl">
-    <div class="l now"><b>L1 · 上下文注入</b><small>把指标定义注入 prompt——消灭同义词歧义、隐式默认、时间语义三类失败根因。AI 读的是口径，不是猜。</small></div>
-    <div class="l now"><b>L2 · 工具化调用</b><small>AI 不生成 SQL，调用 <code>query_metric()</code>——SQL 由语义层编译，口径错误在架构上不可能发生。对应 Cube MCP 的 leading pattern。</small></div>
-    <div class="l"><b>L3 · 口径自动治理</b><small>（路线图）AI 起草新指标 YAML → 校验 → 人审 → 注册。语义层从被消费升级为被维护。</small></div>
+  <h2 class="sec"><span class="no">1</span>三层递进</h2>
+  <div class="grid g3">
+    <div class="dcard"><div class="dh"><b>L1 · 上下文注入</b><span class="tg-ok">已实现</span></div>
+      <ul><li>把指标定义注入 prompt——消灭同义词歧义、隐式默认、时间语义</li>
+      <li><b>已知缺陷一并注入</b>：否则"人知道不可信、AI 拿它当结论"</li></ul></div>
+    <div class="dcard"><div class="dh"><b>L2 · 工具化调用</b><span class="tg-ok">已实现（预计算链路）</span></div>
+      <ul><li>AI 不生成 SQL，调用 <code>query_metric()</code>——SQL 由语义层编译</li>
+      <li>口径错误在架构上不可能发生；对应 Cube MCP 的 leading pattern</li></ul></div>
+    <div class="dcard"><div class="dh"><b>L3 · 口径自动治理</b><span class="tg-plan">规划</span></div>
+      <ul><li>AI 起草新指标 YAML → 校验 → 人审 → 注册</li>
+      <li>语义层从被消费升级为被维护</li></ul></div>
   </div>
 
-  <h2 class="sec"><span class="no">02</span>五个问题的完整链路</h2>
-  <p class="desc">每张卡片：注入的上下文（L1）→ 工具调用（L2）→ 语义层编译的 SQL → 结果 → 以及"裸 text-to-SQL 会错在哪"。</p>
-  <div class="tip-inf" style="border-left-color:var(--amber);background:var(--amber-wash)">
-    <b>这不是一次现场 LLM 推理</b>：以下五条链路由 <code>build.py</code> 在构建时预计算并落成 JSON 快照
-    （<code>api/ai_demo.json</code>），用于演示<b>架构与口径流转</b>，页面上不会发生模型调用。
-    真实接入形态是：同一份 <code>ai_context()</code> 注入 prompt → 模型返回 <code>query_metric</code> 工具调用 →
-    语义层 <code>query()</code> 执行 → 结果回填。两者共用同一段编译逻辑，差别只在"谁来选指标和维度"。
-  </div>
+  <h2 class="sec"><span class="no">2</span>五个问题的完整链路（L1 → L2 → SQL → 结果 → 裸 SQL 对照）</h2>
+  <p class="sec-sub">每张卡片可展开：注入的上下文（L1）→ 工具调用（L2）→ 语义层编译的 SQL → 结果 → 以及"裸 text-to-SQL 会错在哪"。</p>
+  <div class="co co-warn"><span class="cot">这不是一次现场 LLM 推理</span>
+  以下五条链路由 <code>build.py</code> 在构建时预计算并落成 JSON 快照（<code>api/ai_demo.json</code>），
+  用于演示<b>架构与口径流转</b>，页面上不会发生模型调用。真实接入形态是：同一份 <code>ai_context()</code> 注入 prompt →
+  模型返回 <code>query_metric</code> 工具调用 → 语义层 <code>query()</code> 执行 → 结果回填。
+  两者共用同一段编译逻辑，差别只在"谁来选指标和维度"。MCP 出口在 <a href="services.html">服务出口</a>标为规划。</div>
   <div id="qas"></div>
 
-  <div class="card" style="margin-top:26px">
-    <h3>诚实边界</h3>
-    <p>语义层是必要条件而非充分条件——指标覆盖不全时 AI 仍会退回裸 SQL，复杂探索仍需人；语义层自身也需要治理（谁批准新指标？口径变更谁签字？）。本演示的五问均为预计算的真实链路（build.py 执行），非 LLM 现场生成——演示的是<b>架构</b>，不是模型能力。</p>
+  <h2 class="sec"><span class="no">3</span>裸 Text2SQL 的五类失败 × 架构关闭</h2>
+  <table class="tb">
+    <tr><th style="width:140px">失败类型</th><th>典型表现</th><th>语义层怎么关掉</th></tr>
+    <tr><td><b>同义词歧义</b></td><td>"付费用户" → payers? subscribers? 含不含退款? 四种口径四个数</td>
+      <td>AI 读的是注入的 <code>ai_context()</code>，指标名与定义一一对应，不靠猜</td></tr>
+    <tr><td><b>隐式默认</b></td><td>时间窗/退款口径/去重逻辑全是隐式默认，每次生成的 SQL 都可能不同</td>
+      <td>default_time / grain 显式声明；工具调用必须带 granularity（check.py 强制）</td></tr>
+    <tr><td><b>时间语义</b></td><td>"上周"在周一和周日跑出不同结果；UTC 与本地时区差一天</td>
+      <td>窗口锚定 + BETWEEN 语义由编译器统一生成</td></tr>
+    <tr><td><b>口径陷阱</b></td><td>分摊规则、队列成熟度、nullif 分母——模型不可能从 schema 猜出来</td>
+      <td>规则在 expr 与 notes 里；notes 缺陷按关键词整行注入并要求"引用前必须一起说明"</td></tr>
+    <tr><td><b>幻觉 schema</b></td><td>编造不存在的列/表；非法维度被静默丢弃成"总值"</td>
+      <td>引擎对非法维度<b>抛错</b>；AI 只能调用工具，不直连库</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">4</span>AI 编程提效：这个站是怎么被建出来的</h2>
+  <div class="co co-good"><span class="cot">不藏工具</span>
+  本项目（含 dbt 迁移、74 项行级测试、守恒断言、七道门禁、新旧两版站点）由人定义口径与验收标准，
+  AI 编程工具（ZCode / Claude Code / Cursor，即岗位 JD 点名的那类工具）结对完成实现。
+  <b>分工是：AI 写代码，人签口径</b>——指标定义的每一行都是人拍板的，
+  因为口径错误的代价不由工具承担，由开着数据会的业务承担。</div>
+  <div class="grid g2">
+    <div class="dcard"><div class="dh"><b>AI 擅长什么（本项目实证）</b></div>
+      <ul><li>等价迁移：130 行内联 SQL → dbt 模型，基线逐字节 diff 验收</li>
+      <li>测试规模化：74 项行级测试一次生成，类型坑（DECIMAL vs DOUBLE）被 AI 预判</li>
+      <li>门禁工程：把"可信"翻译成可执行断言（占位符渲染/契约反向提取/举证复算）</li></ul></div>
+    <div class="dcard"><div class="dh"><b>AI 不能代替什么（所以才是 owner 岗）</b></div>
+      <ul><li>口径拍板：激活算 1d 还是 7d、归因用首触还是线性——是业务决策</li>
+      <li>诚实边界：哪些结论只是机制推演、哪些阈值偏保守，需要人对着数字说真话</li>
+      <li>验证设计：验收标准（逐字节 diff、判据预注册）先于实现存在，AI 才有靶子</li></ul></div>
   </div>
 
-  <footer>
+  <div class="card">
+    <h3>诚实边界</h3>
+    <p class="small" style="margin:0">语义层是必要条件而非充分条件——指标覆盖不全时 AI 仍会退回裸 SQL，复杂探索仍需人；
+    语义层自身也需要治理（谁批准新指标？口径变更谁签字？）。
+    本演示的五问均为预计算的真实链路（build.py 执行），非 LLM 现场生成——演示的是<b>架构</b>，不是模型能力。</p>
+  </div>
+
+  <footer class="foot">
     <span>MetricHub · 生产对应物：Cube(语义层+MCP server) / dbt MetricFlow(AI agent 消费)</span>
     <span><a href="index.html">↩ 回到总览</a></span>
   </footer>
 </main>
+<script src="assets/nav.js"></script>
 <script>
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 fetch('api/ai_demo.json').then(r=>r.json()).then(qas=>{

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>业务结构与数据域 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">01 · Domains</div>
+    <h1>业务结构与数据域划分</h1>
+    <p class="lead">数据域 = <b>业务过程的抽象集合</b>（Kimball 总线架构），不是组织架构的镜像。
+    建模方法：先识别业务过程（注册/浏览/生成/下单/积分/触点），再围绕过程组织事实表，
+    用一致性维度把它们横向对齐——<b>烟囱式系统的口径冲突，在总线矩阵上就能提前看见。</b></p>
+  </div>
+
+  <div class="co co-note"><span class="cot">推断声明</span>
+  业务画像基于公开信息推断（产品面、融资报道、招聘信息），不涉及任何公司内部数据——
+  每条设定的具体出处见<a href="sources.html">公开信源</a>页；标注「推断」的内容欢迎被事实修正，
+  修正画像后重跑 build，指标体系随之更新，这正是"口径即代码"的工作方式。</div>
+
+  <h2 class="sec"><span class="no">1</span>六个数据域</h2>
+  <p class="sec-sub">现有 16 个 dbt 模型 + 1 个 seed 全部归位（孤儿表 = 0）。「指标组 group」是消费归属（组织视角），
+  与数据域（过程视角）刻意不对齐——对不齐之处正是口径冲突的发生地（见第 3 节）。</p>
+  <table class="tb">
+    <tr><th style="width:88px">数据域</th><th>业务过程</th><th>事实 / 汇总表</th><th>粒度</th><th>服务的决策问题</th></tr>
+    <tr><td><b>D1 用户域</b></td><td>注册（获客结果落账）</td>
+      <td>users → <code>dwd_user</code> <span class="tg-ok">已实现</span>；dim_user(SCD2)、带时分注册事件 <span class="tg-plan">规划</span></td>
+      <td>1 行/用户</td><td>获客质量分群；激活/留存/付费渗透的分母；北极星树「新增侧」</td></tr>
+    <tr><td><b>D2 行为域</b></td><td>页面浏览</td>
+      <td>events → <code>dwd_event</code> <span class="tg-ok">已实现</span>；dwd_session、dim_page、访客 ID <span class="tg-plan">规划</span></td>
+      <td>1 行/浏览（仅日期无时刻）</td><td>漏斗与功能渗透；北极星树缺口「会话/访客数」（现无定义）</td></tr>
+    <tr><td><b>D3 创作域</b></td><td>视频生成（核心价值交付）</td>
+      <td>tasks → <code>dwd_task</code>、<code>dwd_task_ch</code>、<code>dim_model_cost</code>(seed)、<code>dws_model_day</code>、<code>dws_cost_tier_day</code>、<code>dws_company_day</code> <span class="tg-ok">已实现</span>；失败调用成本口径 <span class="tg-plan">规划</span></td>
+      <td>1 行/任务</td><td>模型流量分配与上下架（Veo 3.1 负毛利由此暴露）；北极星进度与毛利护栏</td></tr>
+    <tr><td><b>D4 交易域</b></td><td>下单 / 续订 / 退款</td>
+      <td>orders → <code>dwd_order</code>、<code>dws_cash_day</code>、<code>dws_payer_cohort</code> <span class="tg-ok">已实现</span>；dwd_subscription + 递延收入 <span class="tg-plan">规划</span></td>
+      <td>1 行/订单</td><td>收入确认口径之锚（现金）；定价/套餐设计；续费健康</td></tr>
+    <tr><td><b>D5 积分域</b></td><td>积分发放 / 消耗</td>
+      <td>credits → <code>dwd_credits</code> <span class="tg-ok">已实现</span>；台账资金来源字段或 FIFO 顺位、dws_balance_day <span class="tg-plan">规划</span></td>
+      <td>1 行/台账变动</td><td>积分经济学：免费额度给多少、防薅、余额负债</td></tr>
+    <tr><td><b>D6 获客域</b></td><td>触点曝光 · 渠道投放 · 归因分摊</td>
+      <td>touch → <code>dwd_touch</code>；spend → <code>dwd_spend</code>；<code>dws_channel_day</code>、<code>dws_channel_attr</code>、<code>dws_channel_roas</code> <span class="tg-ok">已实现</span>；订单×触点桥接表(weight=1/touch_cnt) <span class="tg-plan">规划</span></td>
+      <td>1 行/触点；1 行/渠道·日</td><td>预算在 SEO/红人/付费间分配；SEO 助攻价值</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">2</span>总线矩阵：业务过程 × 一致性维度</h2>
+  <p class="sec-sub">◆ = 已实现（字段在事实表中，或经既有 join 可达）；△ = 规划（需补维表/字段）；— = 不适用。
+  唯一成形的维表是 <code>dim_model_cost</code>；日期/用户以 dt 字段 + dwd_user 宽表<b>隐式一致</b>；
+  渠道清单目前散落 3 处（sources.yml accepted_values / 模拟器常量 / 各表字段）各自维护——
+  <span class="tg-plan">规划</span> dim_channel / dim_plan / dim_geo 统一收口。</p>
+  <table class="tb">
+    <tr><th>业务过程 ＼ 维度</th><th class="r">日期</th><th class="r">用户</th><th class="r">模型</th><th class="r">渠道</th><th class="r">套餐</th><th class="r">国家</th><th class="r">平台</th><th class="r">页面</th></tr>
+    <tr><td>注册 users</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td><td class="r">◆</td><td class="r">—</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td></tr>
+    <tr><td>页面浏览 events</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td><td class="r">△ 经用户维</td><td class="r">—</td><td class="r">◆</td><td class="r">◆</td><td class="r">◆ 裸枚举，维表 △</td></tr>
+    <tr><td>生成任务 tasks</td><td class="r">◆</td><td class="r">◆</td><td class="r">◆</td><td class="r">◆ 经 dwd_task_ch</td><td class="r">—</td><td class="r">◆ 经 dwd_task_ch</td><td class="r">◆</td><td class="r">—</td></tr>
+    <tr><td>订单 orders</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td><td class="r">◆ 首触 = dwd_user.channel</td><td class="r">◆ 无维表</td><td class="r">◆</td><td class="r">△ 经用户维</td><td class="r">—</td></tr>
+    <tr><td>积分变动 credits</td><td class="r">◆</td><td class="r">◆</td><td class="r">—</td><td class="r">△ 未建</td><td class="r">△ 未建</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>
+    <tr><td>渠道花费 spend</td><td class="r">◆</td><td class="r">—</td><td class="r">—</td><td class="r">◆</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>
+    <tr><td>触点 touch</td><td class="r"><b style="color:var(--bad)">△ 无 dt 字段</b></td><td class="r">◆</td><td class="r">—</td><td class="r">◆</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">3</span>烟囱式 → 统一数仓：口径冲突的真实案例</h2>
+  <p class="sec-sub">三个典型烟囱：运营只看订单、增长只看渠道、模型组只看任务——每个烟囱内部自洽，跨烟囱即打架。
+  以下是本项目数据上真实发生过的五组冲突，以及统一后「结构消灭」的机制。</p>
+  <table class="tb">
+    <tr><th style="width:200px">烟囱（谁 vs 谁）</th><th>各自报的数（本项目真实案例）</th><th style="width:280px">统一后如何被结构消灭</th></tr>
+    <tr><td><b>财务/运营</b> vs <b>模型组</b></td>
+      <td>旧口径收入 = 消耗积分 × $0.04：14 天消耗 92,185 &gt; 已售发放 65,900，白送额度的燃烧被记成收入 → 毛利 33.1%；现金口径（dws_cash_day）只有 12.9%——会上出现两个「公司毛利」</td>
+      <td><code>dws_cash_day</code> 设守恒断言（必须精确等于订单非退款聚合）；model_gross_margin 分母与 revenue_daily 对齐，两个 unit=usd 的「收入」<b>结构性不可能矛盾</b></td></tr>
+    <tr><td><b>增长·投放</b>（要首触）vs <b>SEO/内容</b>（要助攻）</td>
+      <td>首触归因 $2,829 vs 线性 $1,693，40% 收入不归属任何渠道；各组拿对自己有利的口径开预算会</td>
+      <td>双口径在 metrics.yaml 显式共存、notes 互相引用；linear 已标注「不可用于预算决策」；<span class="tg-plan">规划</span> 桥接表后两口径由同一张桥接表导出，合计必然回到现金</td></tr>
+    <tr><td><b>商业化</b>（发额度）vs <b>增长</b>（看转化）</td>
+      <td>free_credit_burn_rate 旧分母混入订阅附赠（占发放 34%）→ 12/14 天误触发告警；免费口径真值 57.6~81.8%</td>
+      <td>分母 change_type 枚举写死在 YAML，新增发放类型必须显式登记才进口径</td></tr>
+    <tr><td><b>产品</b>（报留存）vs <b>CEO</b>（对留存）</td>
+      <td>无界滚动留存 84.2% vs 严格次日 48.1%；激活 1d/7d 两派各说各话</td>
+      <td>分子分母只写一次（dwd_user.retained_d1）；口径分歧在语义层双注册（activation_1d/7d），可见而非互斥</td></tr>
+    <tr><td><b>模型组</b>（报高成本占比低）vs <b>CEO</b>（看毛利降）</td>
+      <td>high_cost_exposure 阈值 $0.03/秒偏保守：Kling($0.022)、Runway($0.025) 已负毛利却不在分子</td>
+      <td>dws_cost_tier_day 注释显式声明「只度量高成本档占比」；<span class="tg-plan">规划</span> 改动态 break_even = 窗口收入/成功秒数</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">4</span>各域粗糙点自评（诚实边界）</h2>
+  <table class="tb">
+    <tr><th style="width:80px">域</th><th>粗糙点</th><th>现状证据</th><th style="width:250px">补齐路径</th></tr>
+    <tr><td>D1</td><td>注册时刻只有日期精度；payer 是生成时掷硬币的先验，非行为结果</td>
+      <td>users.signup_dt 仅为 date；<code>rng.random() &lt; .06/.05/.03</code></td>
+      <td><span class="tg-plan">规划</span> 注册事件带时分；页面已声明先验性质</td></tr>
+    <tr><td>D2</td><td>事件仅 dt 无时刻、无 session/访客 ID；page 仅 6 枚举、event_type 仅 view</td>
+      <td>北极星树 7 叶中「会话/访客数、沉默召回」无定义（5/7 有定义、4/7 可信）</td>
+      <td><span class="tg-plan">规划</span> 埋点规范 + dwd_session + dim_page——先补埋点维度，不是加一条 YAML</td></tr>
+    <tr><td>D3</td><td>staging 层模型冠 dwd_ 前缀，与目录名（01_staging）不符；成本单价为公开定价粗估；失败任务成本恒 0</td>
+      <td><code>dbt/models/01_staging/dwd_*.sql</code> ×5；dim_model_cost 注释</td>
+      <td><span class="tg-plan">规划</span> 更名 stg_ 前缀（ref 血缘自动跟随）；接真实采购价</td></tr>
+    <tr><td>D4</td><td>现金当期全额确认，已售未消耗积分（负债）无口径</td>
+      <td>dws_cash_day 仅非退款聚合</td>
+      <td><span class="tg-plan">规划</span> dwd_subscription + 递延收入科目</td></tr>
+    <tr><td>D5</td><td>consume 无资金来源；无过期/回收/补偿类型；无余额快照</td>
+      <td>dwd_credits 仅 3 种 change_type；burn rate 只能换分母不能拆分子</td>
+      <td><span class="tg-plan">规划</span> 台账加资金来源或 FIFO 顺位 + dws_balance_day</td></tr>
+    <tr><td>D6</td><td>touch 无 dt/无触点类型 →「注册前 30 天助攻」承诺无法实现；spend 不含 SEO 内容/人力成本 → ROAS 下免费渠道永远第一</td>
+      <td>channel_revenue_linear 已标注不可用于预算决策；dws_channel_day</td>
+      <td><span class="tg-plan">规划</span> touch 补 dt/touch_type/source；channel_spend 纳入人力/内容成本，否则不开预算会</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">5</span>治理落位 Ⅰ：数据质量六维 × 本项目实现</h2>
+  <p class="sec-sub">质量不是一张口号表——每一维都有具体的测试断言或门禁机制背书；未覆盖的部分显式标为规划。</p>
+  <table class="tb">
+    <tr><th style="width:70px">维度</th><th>标准定义</th><th>本项目实现（全部已实现）</th><th style="width:200px">未覆盖 <span class="tg-plan">规划</span></th></tr>
+    <tr><td><b>完整性</b></td><td>该有的记录/字段不缺失</td>
+      <td><code>not_null</code> 测试全覆盖（dwd_order.amount/refund、dwd_user.retained_d1、全部 DWS 表）；check.py 累计口径 14天空日即 FAIL，nullif 声明的空值按设计出参 null</td>
+      <td>源侧字段填充率与行数 SLA 监控</td></tr>
+    <tr><td><b>唯一性</b></td><td>一件事只记一行</td>
+      <td><code>unique</code>（users.user_id、dwd_user.user_id、dws_cash_day.dt、seed dim_model_cost.model）；指标名唯一、北极星 approved 唯一</td>
+      <td>复合键唯一（dws_channel_day 的 dt+channel）</td></tr>
+    <tr><td><b>一致性</b></td><td>同一数字处处相等</td>
+      <td>守恒断言 <code>assert_cash_matches_orders</code>（无容差）与 <code>assert_revenue_allocation_conserves</code>（分摊 ±$0.05 回现金）；序列末点 ≈ 窗口聚合；KPI = 日序列末 7 天之和；流批守恒；catalog 条数 = 源条数</td>
+      <td>数仓 vs 业务库跨系统对账</td></tr>
+    <tr><td><b>有效性</b></td><td>值在合法域内</td>
+      <td><code>accepted_values</code>（渠道/套餐/模型清单）+ <code>relationships</code>（事实→用户外键、model→定价表）；口径契约枚举（unit/group/window/grain）；产物严格 JSON 校验（拒 Infinity/NaN）</td>
+      <td>值域断言（金额非负、时间戳范围）</td></tr>
+    <tr><td><b>及时性</b></td><td>数据按时到位</td>
+      <td>as_of 锚点必须 = 构建锚；compare_out.py 产物新鲜度；每日 cron 前滚窗口</td>
+      <td>freshness SLA 与源延迟告警；dbt source freshness</td></tr>
+    <tr><td><b>准确性</b></td><td>数字与真值相符</td>
+      <td>evidence.py 弹性论断绑定日期对精确复算（&gt;5% FAIL）；ttfc 0/1440 退化检测；队列成熟度标注；verify_served 端到端断言；northstar 判据预注册防事后择优</td>
+      <td>抽样比对真实业务系统（演示无真值可对）</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">6</span>治理落位 Ⅱ：数据生命周期</h2>
+  <table class="tb">
+    <tr><th style="width:90px">层</th><th style="width:190px">载体</th><th>角色</th><th style="width:300px">保留与重建策略</th></tr>
+    <tr><td>ODS</td><td><code>data/*.jsonl</code> ×7</td><td>只记事实不加工（external_location 直挂）</td>
+      <td><span class="tg-ok">已实现</span> 可整体丢弃，<code>build.py --fresh</code> 全量再生</td></tr>
+    <tr><td>DWD/DWS</td><td><code>data/metrichub.duckdb</code></td><td>加工层，ref() 声明依赖</td>
+      <td><span class="tg-ok">已实现</span> 幂等重建；threads=1 逐字节可复现；全量而非增量——14 天全量成本近零，增量反而引入状态</td></tr>
+    <tr><td>产物</td><td><code>out/api/*.json</code></td><td>消费端唯一出口</td>
+      <td><span class="tg-ok">已实现</span> 每次构建整体重写，无历史状态堆积</td></tr>
+    <tr><td>演示形态</td><td>SEED + ANCHOR + <code>--anchor</code></td><td>固定种子下锚点平移只动日期、数值不变</td>
+      <td><span class="tg-ok">已实现</span> <b>可复现性是治理特性而非缺陷</b>：任何历史构建逐字节可重放</td></tr>
+    <tr><td>生产形态</td><td>—</td><td>热区（近90天）/ 温区（T+1）/ 冷区（归档）</td>
+      <td><span class="tg-plan">规划</span> retention 按表分级（订单长留、事件滚动清）、CDC 增量接入、归档可回灌</td></tr>
+  </table>
+
+  <footer class="foot">
+    <span>MetricHub · 数据域按业务过程切分 —— 组织要什么指标是语义层的事，表怎么组织是数仓的事</span>
+    <span><a href="semantic.html">下一章：语义层构建 →</a></span>
+  </footer>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

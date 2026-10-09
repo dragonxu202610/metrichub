@@ -120,8 +120,8 @@ def check_metrics_yaml():
                     if phrase in t:
                         fail(f"site/{p.name} 仍把『{title}』表述为推荐北极星 —— 与 {approved[0]} 冲突")
         if appr_title:
-            if f"推荐<b>{appr_title}</b>" in (ROOT / "site" / "business.html").read_text(encoding="utf-8"):
-                fail(f"business.html 仍推荐『{appr_title}』为北极星, 但审计页已改判为 {approved[0]}")
+            if f"推荐<b>{appr_title}</b>" in (ROOT / "site" / "domains.html").read_text(encoding="utf-8"):
+                fail(f"domains.html 仍推荐『{appr_title}』为北极星, 但审计页已改判为 {approved[0]}")
     # 窗口字面量在三处重复(build / semantic / check), 必须有断言兜住漂移
     # 注意: 这里用非局部变量保存, 否则 check_data 里引用不到(此前踩过 NameError)
     global semantic

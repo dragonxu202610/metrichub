@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>指标体系与北极星 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">03 · Metrics & North Star</div>
+    <h1>指标体系与北极星</h1>
+    <p class="lead">指标体系 = <b>北极星 + 输入树 + 护栏 + 反向指标</b>：北极星回答"公司为什么存在"，
+    输入树回答"什么驱动它"，护栏回答"别为拉高它而伤害公司"，反向指标回答"它有没有被弄虚作假"。
+    以下每个节点都锚定 <code>metrics.yaml</code> 的真实定义——<span class="tg-ok">已实现</span>可直接查数，<span class="tg-plan">规划</span>给出了定义草案。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">1</span>北极星：结论卡</h2>
+  <div class="card">
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+      <span style="font-size:15px;font-weight:700">北极星 = <code>active_creators</code> 周活跃成功创作者数</span>
+      <span class="tg-acc">approved · 唯一</span>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--muted)">7d 滚动去重 · 不可加 · 末值 <b class="num">4,278</b> 人（__WIN_START__ ~ __WIN_END__）</span>
+    </div>
+    <table class="tb" style="margin-top:12px">
+      <tr><th>候选</th><th class="r">与收入相关系数</th><th class="r">与收入弹性</th><th class="r">末值</th><th>判定</th></tr>
+      <tr><td><b>周活跃创作者数</b>（人）</td><td class="r num">0.997</td><td class="r num">1.71</td><td class="r num">4,278</td><td><b>当选——机制论证，非数据背书</b>（R1 见下）</td></tr>
+      <tr><td>周成功创作数（次数）</td><td class="r num">0.997</td><td class="r num">1.51</td><td class="r num">13,542</td><td>保留为消耗·次数口径</td></tr>
+      <tr><td>周生成分钟数（分钟）</td><td class="r num">0.997</td><td class="r num">1.52</td><td class="r num">1,576</td><td>保留为消耗·成本口径</td></tr>
+    </table>
+    <p class="small" style="margin:8px 0 0">R1 输出「<b>不可区分</b>」——三者与收入的相关系数均为 0.997，演示数据无法裁决。
+    选「人」的依据是机制论证（见下节），需 ≥2 个季度真实数据重跑判据后才算数据背书。
+    判据预注册于 <code>northstar_eval.py</code>（先于结果存在，防事后择优），证据落盘
+    <a href="out/api/northstar_evidence.json" target="_blank" rel="noopener">northstar_evidence.json</a>。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">2</span>为什么是「人」不是「次数/分钟」：机制论证</h2>
+  <div class="grid g2">
+    <div class="dcard"><div class="dh"><b>计量单位与成本单位不同构</b></div>
+      <ul><li>次数把 2 秒与 12 秒同记为 1（实测平均 <b class="num">7.0 秒/次</b>，恰为生成时长分布的算术结果）</li>
+      <li>分钟数直接挂钩 API 成本——把它当北极星，等于让"成本"最大化</li></ul></div>
+    <div class="dcard"><div class="dh"><b>计数器可被撑起，「人」不会</b></div>
+      <ul><li>重度用户与赠送额度能把次数/分钟撑起，创作者数不能</li>
+      <li>护栏数据佐证：Veo 3.1 成功率 <b class="num">96.7%</b> 全场最高、创作占比仅 5.4%、毛利 <b style="color:var(--bad)">−125.6%</b>——次数上升可与毛利下降同时发生</li></ul></div>
+  </div>
+
+  <h2 class="sec"><span class="no">3</span>输入指标树：四个增长引擎 + 变现验证边</h2>
+  <p class="sec-sub">增长引擎逻辑：什么带来新创作者（A）→ 什么让他们第一次成功（B）→ 什么让他们每周回来（C）→ 什么加深使用（D）→ 这一切能否换成钱（E）。</p>
+  <ul class="tree">
+    <li><span class="tnode root"><b>active_creators</b> 周活跃创作者 <span class="tnum num">4,278</span> <span class="tg-acc">北极星</span><span class="tv">滚动 7 日去重，非可加</span></span>
+      <ul>
+        <li><span class="tnode engine"><b>A · 获取</b><span class="tv">什么带来新创作者</span></span>
+          <ul>
+            <li><span class="tnode"><b>sessions</b> 会话数 <span class="tg-plan">规划</span><span class="tv">basis dwd_event · 需补 session_id——漏斗第一跳目前是空的</span></span></li>
+            <li><span class="tnode"><b>signup_rate</b> 注册率 <span class="tg-plan">规划</span><span class="tv">new_users ÷ sessions · 分母缺，只能算半步</span></span></li>
+            <li><span class="tnode"><b>new_users</b> 日新注册 <span class="tnum num">5,961</span> <span class="tg-ok">已实现</span><span class="tv">最大源 google-organic 1,689</span></span></li>
+            <li><span class="tnode"><b>seo_signup_share</b> SEO 注册占比 <span class="tg-ok">已实现</span><span class="tv">自然流量依赖度</span></span></li>
+            <li><span class="tnode"><b>cac</b> 渠道获客成本 <span class="tg-ok">已实现</span><span class="tv">$1.8(affiliate) ~ $8.4(facebook-ads)</span></span></li>
+          </ul></li>
+        <li><span class="tnode engine"><b>B · 激活</b><span class="tv">什么让他们第一次成功</span></span>
+          <ul>
+            <li><span class="tnode"><b>activation_1d / activation_7d</b> <span class="tg-ok">已实现</span><span class="tv">1d/7d 两派双注册 · 队列成熟度已标注</span></span></li>
+            <li><span class="tnode"><b>ttfc_median</b> 注册→首生分钟中位数 <span class="tg-ok">已实现</span><span class="tv">带分钟精度，激活速度</span></span></li>
+            <li><span class="tnode"><b>first_day_creations</b> 首日成功创作数 <span class="tg-ok">已实现</span><span class="tv">激活的绝对值形态</span></span></li>
+            <li><span class="tnode"><b>new_user_creations_per_user</b> <span class="tg-plan">规划</span><span class="tv">恒等式「新增侧 = 新增 × 激活率 × 人均创作」的缺口项</span></span></li>
+          </ul></li>
+        <li><span class="tnode engine"><b>C · 黏性</b><span class="tv">什么让他们每周回来</span></span>
+          <ul>
+            <li><span class="tnode"><b>retention_d1</b> 严格次日留存 <span class="tnum num">48.1%</span> <span class="tg-ok">已实现</span><span class="tv">无界滚动口径会虚高到 84.2%</span></span></li>
+            <li><span class="tnode"><b>dau</b> 日活跃 <span class="tg-ok">已实现</span><span class="tv">页面事件口径组（与成功生成口径组不同）</span></span></li>
+            <li><span class="tnode"><b>wau_stickiness</b> DAU/WAU <span class="tg-plan">规划</span><span class="tv">两口径组比值仅作方向参考，notes 须声明不可比</span></span></li>
+            <li><span class="tnode"><b>silent_reactivation</b> 沉默召回 <span class="tg-plan">规划</span><span class="tv">≥7d 无事件后回归——需补埋点，恒等式「召回侧」缺口</span></span></li>
+          </ul></li>
+        <li><span class="tnode engine"><b>D · 深度</b><span class="tv">什么加深使用</span></span>
+          <ul>
+            <li><span class="tnode"><b>creations_per_active_user</b> 人均成功创作 <span class="tnum num">3.2</span> <span class="tg-ok">已实现</span><span class="tv">防「一人一条」</span></span></li>
+            <li><span class="tnode"><b>deep_creator_share</b> 深度创作者占比 <span class="tg-plan">规划</span><span class="tv">周创作≥2次 ÷ 活跃创作者 · 一行 YAML 即可</span></span></li>
+            <li><span class="tnode"><b>weekly_successful_creations</b> <span class="tnum num">13,542</span> / <b>weekly_minutes_generated</b> <span class="tnum num">1,576</span> <span class="tg-ok">已实现</span><span class="tv">候选 B/C，只作树节点不做北极星</span></span></li>
+            <li><span class="tnode"><b>effect_penetration</b> 特效渗透率 <span class="tg-ok">已实现</span><span class="tv">病毒拉新入口健康度（Referral 代理）</span></span></li>
+          </ul></li>
+        <li><span class="tnode engine"><b>E · 变现验证边</b><span class="tv">北极星为什么值钱——不进树，进验证</span></span>
+          <ul>
+            <li><span class="tnode"><b>paying_users / payers_ratio / arppu / revenue_daily</b> <span class="tg-ok">已实现</span><span class="tv">付费率设定 3-6%（influencer 6% / seo 5% / 其他 3%）· lite $15/300 积分 · pro $29/800 积分</span></span></li>
+          </ul></li>
+      </ul></li>
+  </ul>
+
+  <h2 class="sec"><span class="no">4</span>证据与边界：同向，但不线性</h2>
+  <div class="card">
+    <p style="margin:0 0 6px">相邻两日对比：<b class="num">__PAIR1_FROM__→__PAIR1_TO__</b> 创作数 +8.1% 而收入 +84.3%，<b>弹性 10.4</b>；
+    另一组相邻日（<b class="num">__PAIR2_FROM__→__PAIR2_TO__</b>，+15.9% vs +32.9%）弹性约 <b>2.06</b> —— 两组同为"同向"，弹性却差约 5 倍。</p>
+    <p class="small" style="margin:0">结论：只能说「创作与收入同向」，<b>不能说线性、不能互相折算</b>。
+    证据窗口 <code>__WIN_START_FULL__ ~ __WIN_END__</code>，日期对绑定日序列可精确复算（evidence.py，偏差 &gt;5% 即 FAIL）。
+    以上均为演示数据上的<b>机制推演 / 可复现复算</b>，不是对任何真实公司的实证。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">5</span>护栏指标：防「为拉北极星而伤害公司」</h2>
+  <table class="tb">
+    <tr><th style="width:90px">护栏</th><th style="width:300px">指标与现值</th><th>防什么 · 反例动作</th></tr>
+    <tr><td><b>毛利</b></td><td>company_gross_margin <b class="num">12.9%</b>（旧口径 33.1% 已修）；model_gross_margin（Veo 3.1 <span style="color:var(--bad)">−125.6%</span>）<span class="tg-ok">已实现</span></td>
+      <td>防体验优先烧穿毛利。反例：把默认模型切到 Veo 3.1（成功率 96.7% 全场最高）拉北极星 → 公司毛利被单一模型打穿</td></tr>
+    <tr><td><b>付费留存</b></td><td>payer_retention_wow <b class="num">13.5%</b>（单期快照）<span class="tg-ok">已实现</span></td>
+      <td>防北极星被一次性尝鲜撑起。反例：用赠送额度把纯白嫖用户灌进 active_creators——创作涨、续费不动</td></tr>
+    <tr><td><b>成本暴露</b></td><td>high_cost_exposure <b class="num">13.1%</b>；balance_capped_revenue_gap <b class="num">$1,535.2</b><span class="tg-ok">已实现</span></td>
+      <td>防「生成免单化」。反例：放宽余额检查让余额不足也能生成 → 秒数照记、收入被 min(balance, secs) 封顶，gap 扩大</td></tr>
+    <tr><td><b>退款</b></td><td>refund_rate <span class="tg-plan">规划</span>（模拟器已写 2% 退款，语义层未注册）</td>
+      <td>防 paying_users 之外的口径盲区。反例：强推 Pro $29 不管理预期冲收入</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">6</span>反向指标（counter metrics）</h2>
+  <table class="tb">
+    <tr><th style="width:240px">反向指标</th><th style="width:110px">状态</th><th>说明</th></tr>
+    <tr><td>任务失败率</td><td><span class="tg-ok">半有</span></td>
+      <td>model_success_rate 已实现（按模型 85.4~96.7%）；<span class="tg-plan">规划</span> task_failure_rate 全局口径 + channel/platform 维度——失败体验与渠道质量相关</td></tr>
+    <tr><td>退款率</td><td><span class="tg-bad">无</span></td><td>同护栏表 refund_rate <span class="tg-plan">规划</span></td></tr>
+    <tr><td>免费额度依赖</td><td><span class="tg-ok">有（近似）</span></td>
+      <td>free_credit_burn_rate 57.6~81.8%（&lt;55% 告警）+ paid_credit_burn_rate；精确的「免费消耗占总消耗」不可算——台账无资金来源字段（<a href="domains.html">D5 粗糙点</a>）</td></tr>
+    <tr><td>深度创作者占比</td><td><span class="tg-bad">无</span></td><td>deep_creator_share <span class="tg-plan">规划</span>：防「尝鲜撑起北极星」，即审计推翻条件 R2 的观测项</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">7</span>分域 KPI 视图：各域盯什么，坏了说明什么</h2>
+  <table class="tb">
+    <tr><th style="width:80px">域</th><th>盯什么</th><th>坏了说明什么</th></tr>
+    <tr><td><b>增长</b></td><td>new_users · cac · seo_signup_share · roas · channel_revenue_first_touch</td>
+      <td>CAC 升 / ROAS 降 → 付费渠道质量下滑；new_users 停滞 → 过度依赖自然流量</td></tr>
+    <tr><td><b>产品</b></td><td>activation_7d · ttfc_median · retention_d1 · effect_penetration · creations_per_active_user</td>
+      <td>激活降 → 首次成功门槛高；ttfc 升 → 引导路径流失；留存降 → 价值不可持续</td></tr>
+    <tr><td><b>商业化</b></td><td>paying_users · arppu · revenue_daily · payer_retention_wow · payers_ratio</td>
+      <td>arppu 降 → 套餐结构问题；付费留存低 → 付费价值不足，北极星涨也不换钱</td></tr>
+    <tr><td><b>模型</b></td><td>model_gross_margin · model_success_rate · high_cost_exposure · company_gross_margin · balance_capped_revenue_gap</td>
+      <td>毛利率负 → 定价/成本结构；成功率降 → 直接砸北极星；exposure 升 → 流量押注最贵档（现金平衡点 $0.0217/秒，$0.03 阈值偏保守）</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">8</span>证伪条件：北极星怎么被推翻（判据预注册）</h2>
+  <table class="tb">
+    <tr><th style="width:60px">规则</th><th>内容</th><th style="width:150px">状态</th></tr>
+    <tr><td><b>R1</b></td><td>若真实数据下三候选与收入的弹性/相关显著分化（判据代码先于结果提交），按数据改判</td>
+      <td><span class="tg-warn">当前不可区分</span></td></tr>
+    <tr><td><b>R2</b></td><td>若「北极星涨而付费留存/收入不动」持续 ≥2 个季度 → 北极星失效，重选</td>
+      <td><span class="tg-plan">abstain</span>（付费留存仅单期快照，无法执行）</td></tr>
+    <tr><td><b>R3</b></td><td>成功创作数保留为消耗口径；若「次数与创作者数背离」（重度用户效应）在真实数据可测 → 升级为警报</td>
+      <td><span class="tg-ok">保留</span></td></tr>
+  </table>
+  <p class="tb-note">推翻条件表的完整三态标注（现在可执行 4 / 部分可执行 1 / 需新增定义 1 / 需补埋点 1）在 northstar_evidence.json。</p>
+
+  <h2 class="sec"><span class="no">9</span>31 个指标健康度盘点（粗糙点直说）</h2>
+  <div class="grid g4">
+    <div class="stat acc"><div class="n">28</div><div class="l">承担树/护栏/反向节点</div></div>
+    <div class="stat"><div class="n">3</div><div class="l">降级（同口径形态/失效口径）</div></div>
+    <div class="stat"><div class="n">9</div><div class="l">规划新增（树上有定义草案）</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">真缺口（需埋点/新表，不是加 YAML）</div></div>
+  </div>
+  <ul class="small" style="line-height:2">
+    <li><b>降级 3 个</b>：daily_successful_creations 与 minutes_generated 是 weekly_* 的同口径逐日形态（标注「派生形态」）；channel_revenue_linear 已自认「不可用于预算决策」，降级为口径演示卡，待触点表补 dt/touch_type 后再启用。</li>
+    <li><b>双重身份要标注</b>：model_success_rate 在质量侧分支被审计判「失真」（与北极星口径重复计数），只放模型域 KPI 不进树；payers_ratio（累计渗透）与规划的 free_to_paid_conversion（首单时延）边界必须写清。</li>
+    <li><b>真缺口 4 个</b>：sessions、沉默召回×2、尝试分钟数（模拟器失败任务写 seconds=0，补定义前先修模拟器）。</li>
+    <li><b>严格意义的孤儿为零</b>——但这靠把形态指标算进来撑住，不宣称「31 指标全在树上」。</li>
+  </ul>
+
+  <footer class="foot">
+    <span>MetricHub · 指标定义错了不可怕，没人能发现它错了才可怕 —— 所以北极星自带证伪条件</span>
+    <span><a href="services.html">下一章：数据服务场景 →</a></span>
+  </footer>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

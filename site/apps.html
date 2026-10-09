@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>应用层 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">05 · Applications</div>
+    <h1>应用层</h1>
+    <p class="lead">同一份语义层，四种出口：<b>看板给人看、目录给人查、API 给程序用、AI 给问题用</b>。
+    四种出口跑的是同一条编译 SQL——「单一事实源」在应用层的含义是：不是四个系统各自对了一遍数，
+    而是结构上只有一个数可拿。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">1</span>四个出口</h2>
+  <div class="grid g2">
+    <div class="dcard"><div class="dh"><b>指标看板</b><span class="tg-ok">已实现</span></div>
+      <ul><li>角色化 KPI：北极星 / 配对·深度 / 消耗·次数 / 护栏——每张卡标了它为谁服务</li>
+      <li>模型毛利表、双口径渠道表（含「不可用于预算决策」警示）</li>
+      <li>队列成熟度标注：末点 cohort 未走完观察期会显式提醒，防"暴跌"误读</li></ul>
+      <p class="small"><a href="dashboard.html">打开看板 →</a></p></div>
+    <div class="dcard"><div class="dh"><b>指标目录</b><span class="tg-ok">已实现</span></div>
+      <ul><li>__METRIC_COUNT__ 个指标逐条展开：口径公式 / 时间序列 / 维度分解 / 争议记录</li>
+      <li>序列画法由可加性决定（求和/均值/去重），页面与看板同一算法</li>
+      <li>支持深链（layer.html#m-指标名），口径讨论可以直接甩链接</li></ul>
+      <p class="small"><a href="layer.html">打开目录 →</a></p></div>
+    <div class="dcard"><div class="dh"><b>API 契约</b><span class="tg-ok">已实现</span></div>
+      <ul><li><code>api/catalog.json</code>：全部定义；<code>api/metric_*.json</code>：每指标序列+维度分解</li>
+      <li><code>api/dashboard.json</code>：看板视图模型；<code>api/stream_compare.json</code>：流批对账；<code>api/northstar_evidence.json</code>：北极星证据</li>
+      <li>契约被 check.py <b>反向验证</b>（从前端脚本提取图表键，缺一个就 FAIL）</li></ul></div>
+    <div class="dcard"><div class="dh"><b>静态交付</b><span class="tg-ok">已实现</span></div>
+      <ul><li>out/ 纯静态：GitHub Pages 直接发布，产物站零运行时依赖</li>
+      <li>每日 cron 重建：锚点前滚 + 七道门禁 + 发布，一条流水线</li>
+      <li>旧版归档随发：<a href="v1/index.html">v1 纸白编辑风</a>可从任意新页右上角切换</li></ul></div>
+  </div>
+
+  <h2 class="sec"><span class="no">2</span>治理落位 Ⅳ：权限与安全</h2>
+  <div class="co co-warn"><span class="cot">现状（诚实声明）</span>
+  演示为模拟数据 + 本地单文件库，<b>没有权限、脱敏、审计概念</b>。但架构上留了两个收口：
+  ①语义层是唯一取数通道——AI/看板不直捣业务库，<code>basis</code> 只能指 DWD/DWS；
+  ②合规与隐私（跨境传输、删除权）在 <a href="https://github.com/dragonxu202610/metrichub/blob/main/PLAN-90D.md" target="_blank" rel="noopener">PLAN-90D</a> 里被列为 Day-1 阻塞项，法务牵头。</div>
+  <table class="tb">
+    <tr><th style="width:150px">能力</th><th>生产做法（<span class="tg-plan">规划</span>，演示未做）</th></tr>
+    <tr><td>行级权限</td><td>按 group 业务域 → owner 映射到访问策略（Cube data access policies / MetricFlow token）；例：增长域 owner 看不到他人域的未认证指标</td></tr>
+    <tr><td>列级脱敏</td><td>user_id 哈希、PII 字段在 DWD 层即掩码——脱敏发生在数仓层，语义层出口天然继承</td></tr>
+    <tr><td>审计日志</td><td><code>query_metric</code> 工具调用全量留痕（谁、何时、哪个口径、哪个粒度）——<b>语义层天然是审计日志的最佳埋点位置</b>，这也是"AI 消费也要走语义层"的治理理由</td></tr>
+    <tr><td>多租户/缓存</td><td>服务化（Cube REST/GraphQL）承接；演示的静态 JSON 是其退化形态，契约不变</td></tr>
+  </table>
+
+  <h2 class="sec"><span class="no">3</span>演进取舍：为什么不做「假服务化」</h2>
+  <div class="co co-note"><span class="cot">取舍记录</span>
+  给演示项目加一个 FastAPI 壳很容易，但那只会产出"看起来像服务的静态 JSON"——没有权限、没有缓存、没有多租户，
+  反而模糊了"这是静态交付"的诚实定位。正确的演进是把出口换成 Cube/MetricFlow 的服务化语义层，
+  契约（catalog + query_metric）已经按那个形态设计——<b>先对齐契约，再替换实现，迁移成本最低。</b></div>
+
+  <footer class="foot">
+    <span>MetricHub · 应用层的治理问题（谁能看什么）要在语义层解决, 不在页面层打补丁</span>
+    <span><a href="ai.html">最后一章：AI 消费 →</a></span>
+  </footer>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

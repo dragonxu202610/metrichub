@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据服务场景 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="side"></div>
+<header id="top"></header>
+<main class="wrap">
+  <div class="pagehead">
+    <div class="kicker">04 · Data Services</div>
+    <h1>数据服务场景</h1>
+    <p class="lead">指标的价值在被决策使用的那一刻才成立。本章把口径翻译成六个真实决策场景——
+    每个场景都走完「<b>决策问题 → 核心指标 → 口径陷阱 → 动作</b>」四步；
+    口径陷阱一列是它们存在的理由：跳过这一列，场景就会回到烟囱式猜数。</p>
+  </div>
+
+  <h2 class="sec"><span class="no">1</span>六个决策场景</h2>
+  <div class="grid g2">
+    <div class="dcard"><div class="dh"><b>① 模型流量分配</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>问题</b>：默认模型给谁？哪家该降流量/下架？</li>
+      <li><b>指标</b>：model_gross_margin · model_success_rate · weekly_minutes_generated</li>
+      <li><b>陷阱</b>：收入必须按积分占比分摊到模型——旧口径把白送额度燃烧记成收入，毛利 33.1% vs 现金 12.9%</li>
+      <li><b>动作</b>：Veo 3.1 毛利 <span style="color:var(--bad)">−125.6%</span> → 限流为旗舰选项不给默认流量</li></ul></div>
+    <div class="dcard"><div class="dh"><b>② 渠道预算分配</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>问题</b>：下季度预算在 SEO/红人/付费/联盟间怎么分？</li>
+      <li><b>指标</b>：cac · roas · channel_revenue_first_touch / linear · active_creators 按渠道拆</li>
+      <li><b>陷阱</b>：双口径并存——首触看获客质量、线性看助攻价值；当前数据下线性<b>不可用于预算决策</b>（40% 收入无归属）</li>
+      <li><b>动作</b>：按「首触收入 + 该渠道周活跃创作者」双列决策，见<a href="dashboard.html">看板渠道表</a></li></ul></div>
+    <div class="dcard"><div class="dh"><b>③ 激活路径优化</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>问题</b>：新用户为什么流失？首次成功卡在哪？</li>
+      <li><b>指标</b>：activation_1d/7d · ttfc_median · first_day_creations · retention_d1</li>
+      <li><b>陷阱</b>：「次日」必须是注册次日当天有活动——无界滚动口径把 48.1% 报成 84.2%；队列末点未成熟要标注</li>
+      <li><b>动作</b>：ttfc 分钟中位数定位引导流失点；漏斗第一跳（会话）缺数据 → 埋点需求单</li></ul></div>
+    <div class="dcard"><div class="dh"><b>④ 成本异常监控</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>问题</b>：成本结构有没有往最贵档漂移？</li>
+      <li><b>指标</b>：high_cost_exposure（现值 13.1%）· company_gross_margin</li>
+      <li><b>陷阱</b>：$0.03/秒 是经验阈值不是平衡点——现金平衡点 $0.0217/秒，Kling/Runway 已负毛利却不在分子；阈值声明与指标名必须诚实</li>
+      <li><b>动作</b>：<span class="tg-plan">规划</span> 改动态 break_even = 窗口收入/成功秒数</li></ul></div>
+    <div class="dcard"><div class="dh"><b>⑤ 续费健康度</b><span class="tg-ok">已实现</span></div>
+      <ul><li><b>问题</b>：付费用户下个月还在吗？北极星涨是不是白嫖撑的？</li>
+      <li><b>指标</b>：payer_retention_wow（现值 13.5%，单期快照）· balance_capped_revenue_gap（$1,535.2）</li>
+      <li><b>陷阱</b>：分子必须是「两周都付费」的用户——误写成"本周所有付费用户"，增长期比率会 &gt;100%，护栏把坏消息吃掉</li>
+      <li><b>动作</b>：北极星涨 + 续费不动 → 触发证伪条件 R2 观测</li></ul></div>
+    <div class="dcard"><div class="dh"><b>⑥ 实时任务口径</b><span class="tg-ok">演示级</span></div>
+      <ul><li><b>问题</b>：任务监控上实时大屏，流式数字和离线对不上怎么办？</li>
+      <li><b>指标</b>：批精确 vs watermark vs 纯到达序 三口径</li>
+      <li><b>陷阱</b>：watermark 会<b>丢</b>迟到数据（显式侧输出可审计）；到达序<b>不丢但错窗</b>（无任何报警）——两种病药方不同</li>
+      <li><b>动作</b>：<a href="realtime.html">流批对账</a>——守恒断言作为上线验收方法</li></ul></div>
+  </div>
+
+  <h2 class="sec"><span class="no">2</span>治理落位 Ⅲ：七道门禁 = 发布前的监控</h2>
+  <p class="sec-sub">监控不是上线后才想起来的一张大盘——<b>门禁不过是把告警前移到发布前</b>。
+  每道 CI 门禁都对应一类生产监控的对应物：</p>
+  <table class="tb">
+    <tr><th style="width:230px">CI 步骤（顺序执行）</th><th>门禁职责</th><th style="width:230px">生产监控对应物</th></tr>
+    <tr><td><code>build.py --fresh</code>（内含 dbt build）</td><td>74 行级测试 + 2 守恒断言，不过则构建失败</td><td>ETL 任务的数据质量卡点/告警</td></tr>
+    <tr><td><code>check.py --data</code></td><td>口径契约 / 前端×产物契约 / 跨文件一致 / 数据侧失真</td><td>数据质量巡检（DQC 规则集）</td></tr>
+    <tr><td><code>evidence.py</code></td><td>页面每个数字可从产物复算（弹性按日期对、流批守恒）</td><td>报表数字稽核（BI 数 vs 明细数）</td></tr>
+    <tr><td><code>northstar_eval.py</code></td><td>判据预注册 + 三候选弹性落盘</td><td>指标有效性复盘（防事后择优）</td></tr>
+    <tr><td><code>js_syntax_probe.py</code></td><td>模板字面量/括号配对（无 Node 查白屏）</td><td>前端可用性哨兵</td></tr>
+    <tr><td><code>compare_out.py</code></td><td>占位符按源预渲染后逐文件比对，防"自证同步"</td><td>发版物 vs 源一致性巡检</td></tr>
+    <tr><td><code>verify_served.py --dir</code></td><td>断言发布页关键事实真的渲染</td><td>线上拨测 / 端到端验收</td></tr>
+  </table>
+  <div class="co co-plan"><span class="cot">生产监控四件套（规划）</span>
+  数据可观测性五支柱中，lineage 本项目已有（dbt docs）；其余四件按此规划：
+  <b>freshness</b>（各表 SLA 延迟告警）· <b>volume</b>（行数日环比异常）· <b>schema drift</b>（列增删/类型变更）·
+  <b>distribution</b>（空值率/均值漂移——check.py 的空日与 ttfc 退化检查已是其雏形）。</div>
+
+  <h2 class="sec"><span class="no">3</span>服务出口：谁能拿到数，走哪条路</h2>
+  <table class="tb">
+    <tr><th style="width:170px">出口</th><th>形态</th><th style="width:150px">状态</th></tr>
+    <tr><td>看板</td><td>角色化 KPI + 趋势 + 双口径表，数字全部来自语义层编译 SQL</td><td><a href="dashboard.html">已实现</a></td></tr>
+    <tr><td>指标目录</td><td>31 指标逐条展开：口径/序列/维度分解/争议记录，支持深链</td><td><a href="layer.html">已实现</a></td></tr>
+    <tr><td>API JSON</td><td><code>api/*.json</code> 静态产物（catalog / metric_* / dashboard / stream_compare / northstar_evidence），契约被 check.py 反向验证</td><td><span class="tg-ok">已实现</span></td></tr>
+    <tr><td>流批对账</td><td>三口径守恒 + 偏差曲线，作为实时化的验收方法</td><td><a href="realtime.html">演示级</a></td></tr>
+    <tr><td>MCP / HTTP 服务</td><td><code>query_metric</code> 暴露为 MCP server，AI 现场调用同一编译</td><td><span class="tg-plan">规划</span>（PLAN-90D Day 60-90）</td></tr>
+  </table>
+
+  <footer class="foot">
+    <span>MetricHub · 场景是指标的考场 —— 口径陷阱一列才是这些指标存在的理由</span>
+    <span><a href="apps.html">下一章：应用层 →</a></span>
+  </footer>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

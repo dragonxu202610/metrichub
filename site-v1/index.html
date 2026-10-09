@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MetricHub · 受 AI 消费的指标语义层</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item on" href="index.html">总览</a>
+  <a class="item" href="business.html">业务解构</a>
+  <a class="item" href="northstar.html">北极星审计</a>
+  <a class="item" href="dashboard.html">看板</a>
+  <a class="item" href="layer.html">语义层</a>
+  <a class="item" href="ai.html">AI 问答</a>
+  <a class="item" href="sources.html">信源</a>
+  <a class="item" href="realtime.html">流批对账</a>
+  <span class="right">模拟数据 · 仅作架构演示</span>
+</div></nav>
+<main>
+  <div class="hero">
+    <div class="eyebrow">SEMANTIC LAYER, AS THE SOURCE OF TRUTH</div>
+    <h1>一次定义，处处一致。</h1>
+    <p class="lead">MetricHub 是一个<b>受 AI 消费的指标语义层</b>：__METRIC_COUNT__ 个业务指标以 YAML 声明为唯一事实源，
+    编译成 SQL 供看板取数，同时作为上下文与工具提供给 AI 问答——口径歧义在机器层消灭，而不是靠人记忆。业务设定来自对一类 AI 视频平台的<b>公开信息推断</b>（见「业务解构」页，已声明供检验）。</p>
+    <div class="meta" id="chips">
+      <span class="chip">指标 <b>__METRIC_COUNT__</b> 个</span>
+      <span class="chip">业务域 <b>6</b> 个</span>
+      <span class="chip">消费端 <b>看板 / API / AI</b></span>
+      <span class="chip">核心引擎 <b>~116 行 Python</b></span>
+      <span class="chip">业务画像 <b>推断·已声明</b></span>
+      <span class="chip">北极星 <b>已审计 · 含推翻条件</b></span>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="no">01</span>它解决什么问题</h2>
+  <p class="desc">背景业务是一个多模型聚合、积分订阅制的 AI 视频平台（模拟数据）。3-4 人的数据团队服务全公司时，最常见的死循环是——</p>
+  <div class="grid3">
+    <div class="card"><h3>口径分裂</h3><p>三个团队三个"付费用户"，会上数字打架。口径写在文档里靠人遵守，会腐烂；写进代码里靠机器执行，不会。</p></div>
+    <div class="card"><h3>取数排队</h3><p>每个需求都是手写 SQL，需求量随业务团队增长而数据团队不变。语义层让消费端是机器：看板、接口、AI 都引用同一份定义。</p></div>
+    <div class="card"><h3>AI 答数不可信</h3><p>裸 text-to-SQL 会"自信且不可复现"地编数字——同义词、隐式默认、时间语义全是语义问题。语义层是 AI 答数的治理前提。</p></div>
+  </div>
+
+  <h2 class="sec"><span class="no">02</span>怎么工作</h2>
+  <div class="grid3">
+    <div class="card"><h3>① 定义</h3><p><code>metrics.yaml</code> 里每个指标声明口径公式、可选维度、默认时间窗、单位与版本号。口径争议（如激活的 1d/7d 两派）双注册，让分歧可见而非互斥。</p></div>
+    <div class="card"><h3>② 编译</h3><p>语义层引擎把指标名 + 维度 + 时间窗编译为 SQL，在数仓上执行。看板上的每个数字都能追溯回一条 YAML 定义——改一处，处处变。</p></div>
+    <div class="card"><h3>③ 消费</h3><p>三处消费同一份定义：看板（编译 SQL）、API（JSON 快照）、AI 问答（L1 注入指标定义 + L2 调用 <code>query_metric</code> 工具而非生成 SQL）。</p></div>
+  </div>
+
+  <h2 class="sec"><span class="no">03</span>七个入口</h2>
+  <div class="toc">
+    <a href="business.html"><span class="em">◧</span><b>业务解构</b><p>推断画像：业务域 / 团队构成 / 北极星 / 阶段诊断——本站的地基</p></a>
+    <a href="northstar.html"><span class="em">⌖</span><b>北极星审计</b><p>把推荐的北极星当假设来审：口径语义 / 拆解树覆盖率 / 可归因性 / 推翻条件</p></a>
+    <a href="dashboard.html"><span class="em">◧</span><b>指标看板</b><p>北极星 / 模型毛利 / 双口径渠道归因——每个数字背后是同一份 YAML</p></a>
+    <a href="layer.html"><span class="em">❖</span><b>语义层目录</b><p>__METRIC_COUNT__ 个指标的口径、公式、维度、粒度、版本与争议记录，可展开试查</p></a>
+    <a href="ai.html"><span class="em">✦</span><b>AI 问答演示</b><p>五个真实问题：注入了什么上下文、调用了什么工具、裸 SQL 会错在哪</p></a>
+    <a href="sources.html"><span class="em">◫</span><b>公开信源</b><p>每条业务设定的出处可点开核对：事实(有源) / 推断(标注) / 估算(注明时点) / 假设(声明)</p></a>
+    <a href="realtime.html"><span class="em">≋</span><b>流批对账</b><p>同一条流三种口径：批精确 / watermark / 纯到达序——丢弃与错配是两种不同的病</p></a>
+  </div>
+
+  <h2 class="sec"><span class="no">04</span>一个可以直接验证的细节</h2>
+  <div class="card">
+    <p style="font-size:14px;color:var(--ink)">看板与 AI 问答给出的是<b>同一个数字</b>——因为它们跑的是同一条由 YAML 编译出来的 SQL。
+    打开 <a href="ai.html">AI 问答</a> 里"哪个模型在亏钱"，再对照 <a href="dashboard.html">看板</a>的模型毛利表：
+    Veo 3.1 都是 <span class="neg">负毛利</span>（模拟数据，单价为公开定价的粗略估算）。这正是"单一事实源"的含义：不是承诺一致，是结构上无法不一致。</p>
+  </div>
+
+  <footer>
+    <span>MetricHub · 数据为本地模拟生成（14 天 · 参考真实业务形态）· 核心依赖仅 DuckDB + PyYAML</span>
+    <span>生产对应物：dbt MetricFlow / Cube（语义层 + MCP）</span>
+  </footer>
+</main>
+</body>
+</html>

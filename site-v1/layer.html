@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>语义层 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item" href="index.html">总览</a>
+  <a class="item" href="business.html">业务解构</a>
+  <a class="item" href="northstar.html">北极星审计</a>
+  <a class="item" href="dashboard.html">看板</a>
+  <a class="item on" href="layer.html">语义层</a>
+  <a class="item" href="ai.html">AI 问答</a>
+  <a class="item" href="sources.html">信源</a>
+  <a class="item" href="realtime.html">流批对账</a>
+  <span class="right" id="count">— 个指标</span>
+</div></nav>
+<main>
+  <div class="hero" style="padding-bottom:0">
+    <h1 style="font-size:26px">语义层目录</h1>
+    <p class="lead" style="font-size:14px">这一页就是 <code>metrics.yaml</code> 的渲染——AI 注入的上下文、看板编译的 SQL、口径争议的记录，全部同源。
+    点击任一指标展开：口径定义、时间序列、维度分解。</p>
+    <p class="lead" style="font-size:13px">这些指标的更底层是 dbt 数仓：source(JSONL) → DWD → DWS 的 DAG、
+    每个模型挂载的行级测试与口径守恒断言，见 <a href="dbt-docs/index.html"><b>dbt 血缘图</b></a> ——
+    依赖由 <code>ref()</code> 声明显式可查，不再是"靠人脑记的隐含依赖"。</p>
+  </div>
+  <div id="catalog"></div>
+  <footer>
+    <span>MetricHub · 口径即代码 —— 修改 metrics.yaml 后重新 build, 此页与看板同时变化</span>
+    <span><a href="ai.html">这些定义如何被 AI 消费 →</a></span>
+  </footer>
+</main>
+<script>
+const GROUPS={north_star:'北极星',growth:'增长',product:'产品',monetization:'商业化',model:'模型',attribution:'归因'};
+const UNITS={percent:'%',usd:'$',min:'min',count:'',ratio:'×'};
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+async function loadMetric(name){
+  const r=await fetch(`api/metric_${name}.json`).then(x=>x.json());
+  const series=r.series||[];
+  // 窗口内聚合/去重类指标不提供日序列(逐日拆分语义不成立), 直接只渲染维度分解
+  let spark='';
+  if(series.length>1){
+    // null = 该队列尚未走完观察期(如"次日留存"的当日注册队列)。折线里必须跳过 null 而不是当 0 画,
+    // 否则会画出一个不存在的"跌到底"。
+    const pts0=series.map((s,i)=>({i,v:s.value===null||s.value===undefined?null:+s.value}));
+    const obs=pts0.filter(p=>p.v!==null&&!Number.isNaN(p.v));
+    const max=Math.max(...obs.map(p=>p.v),1e-9);
+    // x 用序列下标而非日期数字: 窗口可能跨月(如 __WIN_START__~__WIN_END__), 按 dt.slice(8) 会画出折返线
+    const pts=obs.map(p=>{
+      const x=p.i/(series.length-1)*100, y=40-(p.v/max)*36;
+      return `${x.toFixed(1)},${Math.max(y,4).toFixed(1)}`;
+    }).join(' ');
+    spark=`<svg class="spark" viewBox="0 0 100 44" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="#3f5bc4" stroke-width="1.4"/>
+    <line x1="0" y1="43" x2="100" y2="43" stroke="#e8e4da" stroke-width="1"/></svg>`;
+  }
+  const dims=Object.entries(r.by_dim||{}).map(([dim,items])=>{
+    const m=Math.max(...items.map(i=>Math.abs(i.value)),1e-9);
+    return `<div class="dimbars"><div class="small" style="margin:4px 0">按 <code>${dim}</code></div>`+
+      items.map(i=>`<div class="dimbar"><span class="k">${esc(i.key)}</span>
+        <div class="track"><div class="fill" style="width:${Math.abs(i.value)/m*100}%;${i.value<0?'background:#c25462':''}"></div></div>
+        <span class="v">${(+i.value).toLocaleString()}</span></div>`).join('')+`</div>`;
+  }).join('');
+  return {spark,dims,notice:r.notice||'',series,series_note:r.series_note||'',by_dim_basis:r.by_dim_basis||'',latest:series[series.length-1]};
+}
+
+fetch('api/catalog.json').then(r=>r.json()).then(async list=>{
+  document.getElementById('count').textContent=list.length+' 个指标';
+  const box=document.getElementById('catalog');
+  for(const [g,label] of Object.entries(GROUPS)){
+    const ms=list.filter(m=>m.group===g);
+    if(!ms.length)continue;
+    const h=document.createElement('div');
+    h.innerHTML=`<div class="mgroup"><b>${label}</b><span>${ms.length} 个指标 · ${g}</span></div>`;
+    box.appendChild(h);
+    for(const m of ms){
+      const card=document.createElement('div');card.className='mcard';card.id='m-'+m.name;
+      card.innerHTML=`
+        <div class="mhead">
+          <span class="caret">▶</span>
+          <span class="mname">${m.name}</span>
+          <span class="mtitle">${esc(m.title)}</span>
+          <span class="mdesc">${esc(m.desc)}</span>
+        </div>
+        <div class="mbody"><div class="loading small">加载中…</div></div>`;
+      const toggle=async()=>{
+        card.classList.toggle('open');
+        const body=card.querySelector('.mbody');
+        if(card.classList.contains('open')&&!body.dataset.loaded){
+          const d=await loadMetric(m.name);
+          body.innerHTML=`
+            <dl class="kv">
+              <dt>口径公式</dt><dd>${esc(m.expr)}</dd>
+              <dt>数据来源</dt><dd>${m.basis}${m.date_field?` (日期列 ${m.date_field})`:''}</dd>
+              <dt>可选维度</dt><dd>${(m.dimensions||[]).join(', ')||'—'}</dd>
+              <dt>默认时间窗</dt><dd>${m.default_time}</dd>
+              <dt>粒度 / 版本</dt><dd>${m.grain||'window'}${m.grain==='window'?' (窗口内单值)':'(逐日值)'} · v${m.version} · 负责人 ${m.owner}</dd>
+            </dl>
+            ${m.notes?`<div class="small" style="border-left:2px solid #e8e4da;padding-left:10px;margin:6px 0;white-space:pre-wrap">${esc(m.notes)}</div>`:''}
+            <div class="small" style="margin-top:8px">单位 <code>${m.unit||'count'}</code>${d.series.length?` · ${esc(d.series_note||'逐日值')} 走势`:''}${d.series.length&&d.latest?` · 序列末点 <b class="num">${d.latest.value===null||d.latest.value===undefined?'—（该队列尚未走完观察期，不出数）':(+d.latest.value).toLocaleString()}${d.latest.value===null||d.latest.value===undefined?'':(UNITS[m.unit]||'')}</b>`:''}</div>
+            ${d.notice?`<div class="small" style="color:var(--amber);margin:4px 0">${esc(d.notice)}</div>`:''}
+            ${d.series.length?`<div class="small" style="color:var(--muted)">下方维度分解为本窗口（<code>14d</code>）${esc(d.by_dim_basis||'')}，与上方序列不是同一粒度</div>`:''}
+            ${d.spark}${d.dims}`;
+          body.dataset.loaded=1;
+        }
+      };
+      card.querySelector('.mhead').addEventListener('click',toggle);
+      if(location.hash==='#m-'+m.name) toggle();   // 支持 business.html 指标芯片深链直达
+      box.appendChild(card);
+    }
+  }
+});
+</script>
+</body>
+</html>

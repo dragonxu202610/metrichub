@@ -181,6 +181,28 @@ def run_dbt_docs():
     print(f"[dbt] 血缘图(可点 DAG) → {dst.relative_to(ROOT)}")
 
 
+def build_v1(tokens):
+    """旧版归档: site-v1 原样发布到 out/v1/(新版页右上角可切换回旧版)。
+    旧页的相对引用要自洽还差两件事: ①api 产物与 dbt-docs 各复制一份(旧页引用 api/ 与 dbt-docs/);
+    ②占位符渲染 + 注入"回新版"悬浮按钮(不改 site-v1 源, 归档保持原样, 注入只发生在交付目录)。"""
+    v1 = OUT / "v1"
+    shutil.copytree(ROOT / "site-v1", v1, dirs_exist_ok=True)
+    shutil.copytree(OUT / "api", v1 / "api", dirs_exist_ok=True)
+    shutil.copytree(OUT / "dbt-docs", v1 / "dbt-docs", dirs_exist_ok=True)
+    back = ('<a class="v1back" href="../index.html" title="切换到新版 v2">新版 v2 →</a>'
+            '<style>.v1back{position:fixed;right:18px;bottom:18px;z-index:999;'
+            'background:#4f46e5;color:#fff;padding:9px 15px;border-radius:999px;'
+            'font-size:12.5px;font-weight:700;text-decoration:none;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.35);font-family:system-ui,sans-serif}</style>')
+    for page in v1.glob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        for token, value in tokens.items():
+            text = text.replace(token, value)
+        if "</body>" in text and 'class="v1back"' not in text:
+            text = text.replace("</body>", back + "</body>", 1)
+        page.write_text(text, encoding="utf-8")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fresh", action="store_true")
@@ -355,10 +377,12 @@ def main():
               "__PAIR1_TO__": a.strftime("%m-%d"),
               "__PAIR2_FROM__": (a - timedelta(days=6)).strftime("%m-%d"),
               "__PAIR2_TO__": (a - timedelta(days=5)).strftime("%m-%d")}
-    # 占位符渲染范围: 交付目录的 html + 仓库级 README(README 不发布, 但指标数是给人看的门面)。
+    build_v1(tokens)
+    # 占位符渲染范围: 交付目录的 html(含 v1 归档页) + 仓库级 README(README 不发布, 但指标数是给人看的门面)。
     # README 的源就是仓库里的 README.md 本身, 所以渲染时把"字面量"回写成占位符形态再渲染 ——
     # 既保持源码里始终是 __METRIC_COUNT__(避免下次改指标数时源码与产物不一致), 又不必来回改写文件。
-    for page in list(OUT.glob("*.html")) + [ROOT / "README.md"]:
+    pages_all = list(OUT.rglob("*.html")) + [ROOT / "README.md"]
+    for page in pages_all:
         raw = page.read_text(encoding="utf-8")
         text = re.sub(r"\d+(\s*)(?=个业务指标|个指标目录|指标定义)", r"__METRIC_COUNT__\1", raw)
         for token, value in tokens.items():
@@ -367,14 +391,14 @@ def main():
             page.write_text(text, encoding="utf-8")
     # 渲染后必须不留占位符(替换前检查"有没有 token"是反的: 那会在成功时报错、失败时沉默)
     leftover = []
-    for page in list(OUT.glob("*.html")) + [ROOT / "README.md"]:
+    for page in pages_all:
         found = re.findall(r"__[A-Z][A-Z_]*__", page.read_text(encoding="utf-8"))
         if found:
-            leftover.append(f"{page.name}:{sorted(set(found))}")
+            leftover.append(f"{page.relative_to(ROOT)}:{sorted(set(found))}")
     if leftover:
         # 占位符没渲染 = 页面会漏出 __METRIC_COUNT__ 这种东西, 必须让 CI 失败而不是只打日志
         raise RuntimeError(f"存在未渲染占位符: {leftover}")
-    print(f"[build] 指标{len(sl.metrics)}个 → {OUT}/ (api + 页面)")
+    print(f"[build] 指标{len(sl.metrics)}个 → {OUT}/ (api + 页面 + v1 归档)")
     print(f"[build] 本地预览: python -m http.server 8898 --directory {OUT}")
 
 

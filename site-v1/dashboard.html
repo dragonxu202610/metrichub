@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看板 · MetricHub</title>
+<link rel="stylesheet" href="assets/style.css">
+<script>
+/* 图表库加载: 按序尝试多个 CDN, 全部失败则降级为数值表而非白屏(访问方网络不可控, 页面不能因 CDN 挂掉) */
+window.ECHARTS_URLS=[
+  'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js',
+  'https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js',
+  'https://unpkg.com/echarts@5.5.0/dist/echarts.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js'];
+window.loadECharts=function(i){
+  i=i||0;
+  if(window.echarts) return Promise.resolve(true);
+  if(i>=window.ECHARTS_URLS.length) return Promise.resolve(false);
+  return new Promise(function(res){
+    var s=document.createElement('script'); s.src=window.ECHARTS_URLS[i]; s.async=true;
+    s.onload=function(){res(!!window.echarts)};
+    s.onerror=function(){res(window.loadECharts(i+1))};
+    document.head.appendChild(s);
+  });
+};
+</script>
+</head>
+<body>
+<nav><div class="nav-in">
+  <span class="nav-brand">Metric<em>Hub</em></span>
+  <a class="item" href="index.html">总览</a>
+  <a class="item" href="business.html">业务解构</a>
+  <a class="item" href="northstar.html">北极星审计</a>
+  <a class="item on" href="dashboard.html">看板</a>
+  <a class="item" href="layer.html">语义层</a>
+  <a class="item" href="ai.html">AI 问答</a>
+  <a class="item" href="sources.html">信源</a>
+  <a class="item" href="realtime.html">流批对账</a>
+  <span class="right" id="gen">快照加载中</span>
+</div></nav>
+<main class="wide">
+  <div class="hero" style="padding-bottom:0">
+    <h1 style="font-size:26px">指标看板</h1>
+    <p class="lead" style="font-size:14px">每个数字都由 <code>metrics.yaml</code> 中的一条定义编译而来——点击右上"语义层"可查看它的口径。</p>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+  <div class="small" id="chartNote" style="display:none;margin:0 0 10px;color:var(--amber)">
+    图表库（CDN）未能加载，趋势已降级为条形 sparkline；指标数值、口径与数据源不受影响。</div>
+
+  <div class="panels">
+    <div class="panel c6"><h3>周活跃创作者 <span class="sub">北极星 · 滚动 7 日去重（按日重算，非逐日相加）</span></h3><div class="chart" id="chCreators"></div></div>
+    <div class="panel c6"><h3>成功创作 <span class="sub">细柱=逐日成功创作数 · 折线=滚动 7 日累计（消耗·次数口径）</span></h3><div class="chart" id="chCreation"></div></div>
+    <div class="panel c6"><h3>活跃与新增 <span class="sub">DAU × 新注册</span></h3><div class="chart" id="chDau"></div></div>
+    <div class="panel c6"><h3>日订阅收入 <span class="sub">非退款订单</span></h3><div class="chart" id="chRev"></div></div>
+    <div class="panel c6"><h3>生成分钟数 <span class="sub">细柱=逐日 · 折线=滚动 7 日（消耗·分钟口径）</span></h3><div class="chart" id="chMinutes"></div></div>
+    <div class="panel c6"><h3>模型毛利率 <span class="sub">近14天 · <span style="color:var(--bad)">红为亏损</span></span></h3>
+      <table id="tbModel"><thead><tr><th>模型</th><th class="r">API $/s<sup>模拟</sup></th><th class="r">毛利率</th><th class="r">成功率</th></tr></thead><tbody></tbody></table>
+      <div class="sub" style="margin-top:6px">聚合窗口 <code>14d</code>（与语义层目录的维度分解同窗口）；API 成本为公开定价的粗略估算（模拟），非实际采购价</div>
+    </div>
+    <div class="panel c12"><h3>渠道归因 · 双口径 <span class="sub">首触看获客质量 · 线性看助攻价值 —— 两口径共存, 禁止混用 · 窗口 <code>14d</code></span></h3>
+      <div class="small" style="color:var(--ink);margin:-4px 0 6px">
+        <b>周活跃创作者</b>列 = 该渠道带来的、近 14 天内完成过成功生成的去重用户数 —— 北极星按渠道拆开，
+        这是"哪个渠道带来的人真的在创作"的直接依据（口径 <code>active_creators</code>）。</div>
+      <div class="small" style="color:var(--amber);margin:-4px 0 8px">
+        ⚠ 当前数据下「线性」列<b>不可用于预算决策</b>：触点表无时间戳与触点类型，且触点数与渠道类型无关，
+        导致该列 ≈ 首触 × (1/平均触点数)，各渠道比值单调一致（0.48~1.0），无法区分助攻型渠道。
+        口径说明见 <a href="layer.html#m-channel_revenue_linear">语义层 · channel_revenue_linear</a>。</div>
+      <table id="tbChannel"><thead><tr><th>渠道</th><th class="r">新用户</th><th class="r">周活跃创作者</th><th class="r">CAC($)</th><th class="r">归因收入·首触($)</th><th class="r">归因收入·线性($)</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <footer>
+    <span id="foot">MetricHub · 快照生成于 —</span>
+    <span><a href="layer.html">指标口径 → 语义层目录</a></span>
+  </footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const fmtN=n=>n==null?'—':Math.abs(n)>=10000?(n/1000).toFixed(1)+'k':Math.round(n).toLocaleString();
+const C={axis:'#d8d3c6',label:'#8b8f98',split:'#efede6',accent:'#3f5bc4',good:'#2e7d5b',amber:'#a8781f',bad:'#c25462'};
+const AXIS={type:'category',axisLine:{lineStyle:{color:C.axis}},axisTick:{show:false},axisLabel:{color:C.label,fontSize:11}};
+const VAL={type:'value',splitLine:{lineStyle:{color:C.split}},axisLabel:{color:C.label,fontSize:11}};
+const TIP={trigger:'axis',backgroundColor:'#fff',borderColor:'#e8e4da',textStyle:{color:'#26292e',fontSize:12},
+           extraCssText:'box-shadow:0 4px 16px rgba(38,41,46,.08);border-radius:8px;'};
+
+fetch('api/dashboard.json').then(r=>r.json()).then(async d=>{
+  $('gen').textContent='快照 · '+d.generated_at+'（as of）';
+  const today=new Date().toISOString().slice(0,10);
+  const stale=d.generated_at!==today;
+  $('foot').innerHTML='MetricHub · 快照生成于 '+d.generated_at+(d.as_of?'（as of）':'')+
+    (stale?' <span style="color:var(--amber)">· ⚠ 该快照非今日构建：以下数字反映的是生成日的数据，'
+           +'契约检查只在语法层可信</span>':'')+
+    ' · <a href="layer.html">指标口径 → 语义层目录</a>';
+  // KPI
+  $('kpis').innerHTML=d.kpis.map(k=>{
+    const v=k.unit==='percent'?k.value+'%':k.unit==='usd'?'$'+fmtN(k.value):k.unit==='ratio'?fmtN(k.value)+'×':fmtN(k.value);
+    const w={ '1d':'当日','7d':'近7天','14d':'近14天'}[k.window]||k.window;
+    const warn=k.immature_last_cohort?` <span style="color:var(--amber)">· ${k.maturity_note}</span>`:'';
+    const role=k.role?`<span class="role">${k.role}</span>`:'';
+    return `<div class="kpi">${role}<div class="k">${k.title}</div><div class="v num">${v}</div><div class="s">${w} · ${k.metric}${warn}</div></div>`;
+  }).join('');
+  const S=k=>(d.charts[k]||[]).map(r=>[String(r.dt).slice(5), +(+r.value).toFixed(1)]);
+  const line=(name,data,color,area)=>({name,type:'line',smooth:true,symbol:'circle',symbolSize:4,data,
+    lineStyle:{color,width:2},itemStyle:{color},
+    areaStyle:area?{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:color+'33'},{offset:1,color:color+'00'}]}}:null});
+  const mk=(id,opt)=>echarts.init($(id)).setOption(opt);
+  const spark=pts=>{
+    const vals=pts.map(p=>p[1]), mx=Math.max.apply(null,vals.concat([1]));
+    return '<div class="fbars">'+pts.map(p=>'<i style="height:'+Math.max(2,Math.round(p[1]/mx*100))+'%" title="'+p[0]+': '+p[1]+'"></i>').join('')+
+      '</div><div class="flab"><span>'+pts[0][0]+'</span><span>'+pts[pts.length-1][0]+'</span></div>';
+  };
+  const hasECharts=await loadECharts();
+  if(hasECharts){
+    // 北极星: 周活跃创作者(滚动 7 日去重) + 消耗口径的成功创作(日值柱 + 滚动 7 日累计线)
+    const cDaily=S('creations'), cRoll=S('creations_7d'), cCreators=S('creators_7d');
+    mk('chCreators',{tooltip:TIP,legend:{top:0,textStyle:{color:C.label,fontSize:11}},
+      grid:{left:52,right:16,top:30,bottom:24},xAxis:AXIS,yAxis:VAL,
+      series:[line('周活跃创作者',cCreators,C.good,true)]});
+    mk('chCreation',{tooltip:TIP,legend:{top:0,textStyle:{color:C.label,fontSize:11}},
+      grid:{left:52,right:16,top:30,bottom:24},xAxis:AXIS,yAxis:VAL,
+      series:[{name:'滚动7日',type:'line',data:cRoll,smooth:true,symbol:'circle',symbolSize:4,
+               lineStyle:{color:C.accent,width:2},itemStyle:{color:C.accent}},
+              {name:'当日',type:'bar',data:cDaily,itemStyle:{color:C.amber,opacity:.55,borderRadius:[3,3,0,0]},barWidth:'42%'}]});
+    mk('chDau',{tooltip:TIP,legend:{top:0,textStyle:{color:C.label,fontSize:11}},grid:{left:44,right:44,top:30,bottom:24},
+      xAxis:AXIS,yAxis:[VAL,{...VAL,splitLine:{show:false}}],
+      series:[line('DAU',S('dau'),C.accent,true),
+              {name:'新注册',type:'bar',data:S('new_users'),itemStyle:{color:C.amber,opacity:.7,borderRadius:[3,3,0,0]},barWidth:'42%'}]});
+    mk('chRev',{tooltip:TIP,grid:{left:48,right:16,top:18,bottom:24},xAxis:AXIS,yAxis:VAL,
+      series:[line('',S('revenue'),C.good,true)]});
+    // 生成分钟数: 与北极星同一画法(日值柱 + 滚动 7 日线), 两个候选口径可直接对比
+    mk('chMinutes',{tooltip:TIP,legend:{top:0,textStyle:{color:C.label,fontSize:11}},
+      grid:{left:48,right:16,top:30,bottom:24},xAxis:AXIS,yAxis:VAL,
+      series:[{name:'滚动7日',type:'line',data:S('minutes_7d'),smooth:true,symbol:'circle',symbolSize:4,
+               lineStyle:{color:C.good,width:2},itemStyle:{color:C.good}},
+              {name:'当日',type:'bar',data:S('minutes'),itemStyle:{color:C.amber,opacity:.55,borderRadius:[3,3,0,0]},barWidth:'42%'}]});
+  }else{
+    // 降级: 图表库不可用时用 sparkline 呈现同一序列, 图与数都不断
+    $('chartNote').style.display='';
+    [['chCreation','creations'],['chDau','dau'],['chRev','revenue'],['chMinutes','minutes'],
+     ['chCreators','creators_7d']].forEach(function(pair){
+      var id=pair[0], key=pair[1];
+      $(id).outerHTML='<div id="'+id+'" class="fallback">'+spark(S(key))+'</div>';
+    });
+  }
+  // 模型毛利表
+  const ms={}; d.tables.model_success.forEach(r=>ms[r.model]=r.value);
+  const COST={'PixVerse V5':.006,'Wan 2.5':.009,'Vidu Q2':.013,'Hailuo 02':.017,
+              'Kling 2.5':.022,'Runway Gen-4':.025,'Sora 2':.030,'Veo 3.1':.048};
+  $('tbModel').querySelector('tbody').innerHTML=d.tables.model_margin
+    .sort((a,b)=>b.value-a.value).map(r=>
+      `<tr><td style="font-size:13px">${r.model}</td>
+       <td class="r num">${(COST[r.model]??0).toFixed(3)}</td>
+       <td class="r ${r.value<0?'neg':'pos'}">${r.value}%</td>
+       <td class="r num">${ms[r.model]??'—'}%</td></tr>`).join('');
+  // 渠道表
+  $('tbChannel').querySelector('tbody').innerHTML=d.tables.channels
+    .sort((a,b)=>b.first_touch-a.first_touch).map(r=>
+      `<tr><td>${r.channel}</td><td class="r num">${fmtN(r.new_users)}</td>
+       <td class="r num"><b>${fmtN(r.active_creators)}</b></td>
+       <td class="r num">${r.cac>0?r.cac:'—'}</td>
+       <td class="r num">${fmtN(r.first_touch)}</td><td class="r num">${fmtN(r.linear)}</td></tr>`).join('');
+}).catch(e=>{$('gen').textContent='加载失败: '+e});
+window.addEventListener('resize',()=>{if(!window.echarts)return;
+  document.querySelectorAll('.chart').forEach(el=>{const c=echarts.getInstanceByDom(el);c&&c.resize()})});
+</script>
+</body>
+</html>

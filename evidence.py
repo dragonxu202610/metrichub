@@ -166,8 +166,8 @@ def main():
                if "被实证" in ln and not any(k in ln for k in ("此前", "应读作", "不再", "改为", "删"))]
         if bad:
             fail(f"{name} 仍把模拟结论当作『实证』: {bad[0].strip()[:60]}")
-    if "机制推演" in pages.get("northstar.html", ""):
-        ok("审计页已把证据强度改写为『机制推演 / 可复现』")
+    if "机制推演" in pages.get("metrics.html", ""):
+        ok("指标页已把证据强度标注为『机制推演 / 可复现』")
 
     # ---------- D. 流批对账(流式样例): 守恒 + 页面引用数字可复算 ----------
     sc = load("stream_compare.json")
